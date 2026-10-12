@@ -13,6 +13,7 @@ import {
 } from '../bloxity/avatarAssets'
 import { loadOBJ, loadPartGLB, loadTexture } from '../bloxity/avatarLoader'
 import { useBloxity } from '../bloxity/BloxityContext'
+import { DEFAULT_PROPORTIONS } from '../bloxity/store'
 import {
   animateRig,
   applyPart,
@@ -33,7 +34,9 @@ function fallbackMotion(delta) {
 }
 
 /**
- * The player's own Bloxity avatar, assembled at runtime.
+ * A Bloxity avatar, assembled at runtime. With no `equipped` prop it shows the
+ * local player's own avatar; other riders pass in the equipped set the server
+ * synced for them.
  *
  * `player.glb` is the base humanoid rig: six skinned meshes (head, torso, two arms,
  * two legs) sharing one skeleton. Assembly means, per equipped slot:
@@ -52,10 +55,24 @@ function fallbackMotion(delta) {
  *   rescaled rather than trusted at native size.
  */
 export const PlayerAvatar = forwardRef(function PlayerAvatar(
-  { onReady, targetHeight = 1.8, motionRef, ...props },
+  {
+    onReady,
+    targetHeight = 1.8,
+    motionRef,
+    equipped: equippedProp,
+    proportions: proportionsProp,
+    reportLoading = false,
+    ...props
+  },
   ref,
 ) {
-  const { avatar: equipped, proportions, game } = useBloxity()
+  const bloxity = useBloxity()
+  const equipped = equippedProp === undefined ? bloxity.avatar : equippedProp
+  const proportions =
+    proportionsProp === undefined
+      ? bloxity.proportions
+      : { ...DEFAULT_PROPORTIONS, ...(proportionsProp || {}) }
+  const { game } = bloxity
   const { scene: baseScene } = useGLTF(BASE_BODY_URL)
   const [assembled, setAssembled] = useState(false)
 
@@ -101,7 +118,7 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
     // hat/back can be removed rather than stacking up.
     const attached = []
 
-    game.loadingStep('Loading avatar…')
+    if (reportLoading) game.loadingStep('Loading avatar…')
 
     const jobs = []
 
@@ -183,7 +200,7 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
         object.traverse((child) => child.geometry?.dispose())
       }
     }
-  }, [rig, equipped, game])
+  }, [rig, equipped, game, reportLoading])
 
   // --- Proportions -------------------------------------------------------------
   // Applied per frame rather than in an effect: every bone is reset to its rest pose
