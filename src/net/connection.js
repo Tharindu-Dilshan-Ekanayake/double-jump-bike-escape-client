@@ -203,12 +203,12 @@ function wireRoom(r) {
   })
 
   r.onMessage('joined', ({ name }) => {
-    gameState().addChat({ system: true, text: `${name} joined the lobby` })
     const sdk = getSDK()
     safeCall(sdk?.game?.playerJoined?.bind(sdk.game), name)
   })
 
-  r.onMessage('left', ({ name }) => gameState().addChat({ system: true, text: `${name} left the lobby` }))
+  // Nobody gets a "joined / left the lobby" message; the server still sends it.
+  r.onMessage('left', () => {})
 
   r.onStateChange(() => syncFromState())
 
