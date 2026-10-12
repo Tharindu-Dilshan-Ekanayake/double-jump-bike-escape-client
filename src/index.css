@@ -2,8 +2,12 @@
 
 :root {
   color-scheme: dark;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Fredoka', system-ui, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  --ink: #15151d;
+  /* Set from JS so the HUD shrinks on small screens (see useUiScale). */
+  --ui-scale: 1;
+  --hud-scale: 0.8;
 }
 
 html,
@@ -12,10 +16,1092 @@ body,
   height: 100%;
   margin: 0;
   overflow: hidden;
+  background: #0f1724;
 }
 
 /* The R3F canvas fills its container; the HUD is absolutely positioned over it. */
 canvas {
   display: block;
+  touch-action: none;
+}
+
+button {
+  font: inherit;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Text                                                                      */
+/* ------------------------------------------------------------------------ */
+
+.game-text {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  font-weight: 700;
+  color: #fff;
+  -webkit-text-stroke: 0.17em var(--ink);
+  paint-order: stroke fill;
+  letter-spacing: 0.01em;
+}
+
+.title-text {
+  font-family: 'Luckiest Guy', 'Fredoka', system-ui, sans-serif;
+  font-weight: 400;
+  color: #fff;
+  -webkit-text-stroke: 0.13em var(--ink);
+  paint-order: stroke fill;
+  letter-spacing: 0.03em;
+}
+
+.ink-text {
+  font-family: 'Fredoka', system-ui, sans-serif;
+  color: #262a36;
+}
+
+.ui-scaled {
+  zoom: var(--ui-scale);
+}
+.hud-scaled {
+  zoom: var(--hud-scale);
+}
+
+
+.press {
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform 0.12s ease,
+    filter 0.12s ease,
+    box-shadow 0.12s ease;
+}
+.press:hover {
+  transform: translateY(-2px) scale(1.04);
+  filter: brightness(1.1) saturate(1.1);
+}
+.press:active {
+  transform: translateY(3px) scale(0.97);
+}
+
+/* Glossy highlight across the top half of buttons and tiles. */
+.btn-chunky::before,
+.tile::before,
+.round-icon::before {
+  content: '';
+  position: absolute;
+  inset: 4px 6px 50% 6px;
+  border-radius: 10px 10px 18px 18px / 10px 10px 8px 8px;
+  background: linear-gradient(rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.06));
+  pointer-events: none;
+}
+.btn-chunky > *,
+.tile > *,
+.round-icon > * {
+  position: relative;
+}
+
+/* A light sweep across the main buttons every few seconds. */
+.btn-shine::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent 42%, rgba(255, 255, 255, 0.65) 50%, transparent 58%);
+  background-size: 300% 100%;
+  animation: shine 3.6s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shine {
+  0%,
+  65% {
+    background-position: 150% 0;
+  }
+  100% {
+    background-position: -50% 0;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Left column                                                               */
+/* ------------------------------------------------------------------------ */
+
+.stat-pill {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 62px;
+  width: 250px;
+  padding-left: 84px;
+  font-size: 42px;
+  background: linear-gradient(90deg, rgba(12, 16, 28, 0.86), rgba(22, 30, 48, 0.72) 75%, rgba(22, 30, 48, 0.2));
+  border: 3px solid rgba(255, 255, 255, 0.22);
+  border-radius: 999px;
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.12),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+}
+.stat-pill .stat-icon {
+  position: absolute;
+  left: -6px;
+  top: 50%;
+  width: 78px;
+  height: 78px;
+  transform: translateY(-50%);
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35));
+}
+.stat-pill .stat-plus {
+  position: absolute;
+  left: 52px;
+  bottom: -6px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(#7dff7d, #2fbf3a);
+  border: 3px solid var(--ink);
+  box-shadow: 0 2px 0 var(--ink);
+  color: #fff;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 108px;
+  height: 108px;
+  border: 4px solid var(--ink);
+  border-radius: 20px;
+  box-shadow:
+    inset 0 -9px 0 rgba(0, 0, 0, 0.22),
+    0 6px 0 var(--ink),
+    0 12px 16px rgba(0, 0, 0, 0.3);
+}
+.tile:active {
+  box-shadow:
+    inset 0 -5px 0 rgba(0, 0, 0, 0.22),
+    0 2px 0 var(--ink);
+}
+.tile .tile-icon {
+  font-size: 60px;
+  line-height: 1;
+  filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.35));
+  transition: transform 0.2s ease;
+}
+.tile:hover .tile-icon {
+  transform: rotate(-8deg) scale(1.1);
+}
+.tile .tile-label {
+  position: absolute;
+  bottom: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 1px 8px 2px;
+  border-radius: 999px;
+  background: linear-gradient(rgba(30, 36, 52, 0.95), rgba(14, 18, 28, 0.95));
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  -webkit-text-stroke: 0.12em var(--ink);
+}
+
+/* Keyboard shortcut cap in a button's top-left corner. */
+.press > .key-badge,
+.key-badge {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: linear-gradient(#ffffff, #dce3ee);
+  border: 3px solid var(--ink);
+  box-shadow: 0 3px 0 var(--ink);
+  color: #15151d;
+  font: 800 14px 'Fredoka', system-ui, sans-serif;
+  line-height: 1;
+  -webkit-text-stroke: 0;
+  pointer-events: none;
+}
+.top-btn {
+  position: relative;
+}
+.top-btn > .key-badge {
+  top: -7px;
+  left: -7px;
+  min-width: 22px;
+  height: 22px;
+  font-size: 12px;
+  border-width: 2px;
+  box-shadow: 0 2px 0 var(--ink);
+}
+.tile-trails {
+  background: radial-gradient(circle at 30% 20%, #fff2a8, #ffc21f 45%, #ff7a1f 90%);
+}
+.tile-auras {
+  background: radial-gradient(circle at 30% 20%, #f8c9ff, #cf5cff 45%, #7d22d8 90%);
+}
+.tile-rebirth {
+  background: radial-gradient(circle at 30% 20%, #c4f0ff, #3fb0ff 45%, #1f4ee0 90%);
+}
+.tile-inventory {
+  background: radial-gradient(circle at 30% 20%, #f2ffb0, #a6ec2f 45%, #3fb42a 90%);
+}
+
+.alert-badge {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #ee3434;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 3px var(--ink);
+  color: #fff;
+  font-size: 24px;
+  font-weight: 800;
+  animation: badge-bounce 1s ease-in-out infinite;
+}
+
+@keyframes badge-bounce {
+  0%,
+  100% {
+    transform: translateY(0) scale(1);
+  }
+  50% {
+    transform: translateY(-5px) scale(1.08);
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Right column                                                              */
+/* ------------------------------------------------------------------------ */
+
+.btn-chunky {
+  position: relative;
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  box-shadow:
+    inset 0 -7px 0 rgba(0, 0, 0, 0.22),
+    0 5px 0 var(--ink),
+    0 10px 14px rgba(0, 0, 0, 0.28);
+}
+.btn-chunky:active {
+  box-shadow:
+    inset 0 -4px 0 rgba(0, 0, 0, 0.22),
+    0 1px 0 var(--ink);
+}
+.btn-chunky:disabled {
+  cursor: default;
+  filter: saturate(0.6);
+}
+.btn-green {
+  background: linear-gradient(#8dff8a, #3fdc4a 45%, #1fa83a);
+}
+.btn-white {
+  background: linear-gradient(#ffffff, #eef3fb 45%, #c9d3e3);
+}
+.btn-red {
+  background: linear-gradient(#ff958a, #ff4a3d 45%, #c8221f);
+}
+.btn-blue {
+  background: linear-gradient(#9ddcff, #3fa8ff 45%, #1f63d8);
+}
+.btn-purple {
+  background: linear-gradient(#ebb6ff, #b45cff 45%, #7a22e0);
+}
+.btn-orange {
+  background: linear-gradient(#ffe08a, #ffad2f 45%, #f0761a);
+}
+.btn-gray {
+  background: linear-gradient(#e3e7ee, #b4bbc7 45%, #848c99);
+}
+.btn-rainbow {
+  background: linear-gradient(90deg, #ff3b3b, #ff9a1f, #ffe23a, #3bd16b, #3ba8ff, #8a4dff, #ff3b3b);
+  background-size: 200% 100%;
+  animation: rainbow-slide 3s linear infinite;
+}
+@keyframes rainbow-slide {
+  to {
+    background-position: 200% 0;
+  }
+}
+
+.round-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 70px;
+  height: 70px;
+  font-size: 38px;
+  border: 4px solid var(--ink);
+  border-radius: 50%;
+  box-shadow:
+    inset 0 -6px 0 rgba(0, 0, 0, 0.22),
+    0 4px 0 var(--ink),
+    0 8px 12px rgba(0, 0, 0, 0.28);
+}
+.round-icon::before {
+  inset: 5px 10px 50% 10px;
+  border-radius: 50% 50% 40% 40%;
+}
+.round-blue {
+  background: radial-gradient(circle at 35% 25%, #bfe9ff, #3fa8ff 55%, #1f5ad8);
+}
+.round-pink {
+  background: radial-gradient(circle at 35% 25%, #ffd0ea, #ff5fb0 55%, #d0247a);
+}
+.round-purple {
+  background: radial-gradient(circle at 35% 25%, #ead0ff, #a45cff 55%, #6a22d0);
+}
+
+/* Top-right: who you're playing as. */
+.profile-tag {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 300px;
+  padding: 5px 16px 5px 5px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: linear-gradient(rgba(36, 44, 66, 0.92), rgba(18, 22, 36, 0.92));
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.35);
+}
+.profile-pfp {
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid #fff;
+  background: linear-gradient(#ffe27a, #ffb21f);
+  object-fit: cover;
+  color: #fff;
+}
+.profile-name {
+  overflow: hidden;
+  max-width: 220px;
+  color: #fff;
+  font: 700 19px 'Fredoka', system-ui, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.profile-handle {
+  color: #aab6cc;
+  font: 600 14px 'Fredoka', system-ui, sans-serif;
+}
+.profile-handle.is-account {
+  color: #7fd4ff;
+}
+
+/* Wins rain: trophies fly into the Wins pill, which pops on each one. */
+.wins-rain {
+  position: fixed;
+  inset: 0;
+  z-index: 25;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.stat-pill.pill-hit {
+  animation: pill-hit 0.22s ease-out;
+}
+@keyframes pill-hit {
+  45% {
+    transform: scale(1.07);
+    filter: brightness(1.35);
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Bottom                                                                    */
+/* ------------------------------------------------------------------------ */
+
+.level-bar {
+  position: relative;
+  width: 1020px;
+  height: 60px;
+  overflow: hidden;
+  border: 4px solid var(--ink);
+  border-radius: 8px;
+  background: rgba(225, 232, 245, 0.25);
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+}
+.level-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(#cf96ff, #9a4cf2);
+  transition: width 0.3s ease-out;
+}
+.level-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.1) 0 26px, rgba(0, 0, 0, 0.05) 26px 52px);
+  pointer-events: none;
+}
+.level-bar .level-text {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 18px;
+  font-size: 34px;
+}
+
+.speed-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 66px;
+  min-width: 66px;
+  padding: 0 16px;
+  font-size: 30px;
+  line-height: 1;
+  white-space: nowrap;
+}
+.speed-btn .price {
+  margin-top: 3px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.32);
+  font-size: 17px;
+  -webkit-text-stroke: 0;
+}
+
+.jump-counter {
+  font-size: 72px;
+  line-height: 1;
+  animation: pop-in 0.18s ease-out;
+}
+
+@keyframes pop-in {
+  from {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Top                                                                       */
+/* ------------------------------------------------------------------------ */
+
+.progress-node {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 4px solid var(--ink);
+  font-size: 24px;
+}
+.racer-head {
+  position: absolute;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  overflow: hidden;
+  border-radius: 50%;
+  border: 4px solid #fff;
+  box-shadow: 0 0 0 3px var(--ink);
+  font-size: 26px;
+  transform: translate(-50%, -50%);
+  transition: left 0.3s linear;
+}
+.racer-head img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.top-btn {
+  display: grid;
+  place-items: center;
+  height: 48px;
+  min-width: 48px;
+  padding: 0 12px;
+  border-radius: 14px;
+  background: linear-gradient(rgba(44, 52, 72, 0.9), rgba(16, 20, 30, 0.88));
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 255, 255, 0.15),
+    0 4px 10px rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 24px;
+  backdrop-filter: blur(4px);
+}
+
+/* ------------------------------------------------------------------------ */
+/* Overlays                                                                  */
+/* ------------------------------------------------------------------------ */
+
+.levelup-pop {
+  animation: levelup 2.9s ease-out forwards;
+}
+@keyframes levelup {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+  18% {
+    transform: scale(1);
+  }
+  82% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+}
+
+.toast {
+  padding: 8px 22px;
+  border: 4px solid var(--ink);
+  border-radius: 14px;
+  font-size: 28px;
+  animation: pop-in 0.2s ease-out;
+}
+.toast-success {
+  background: linear-gradient(#5cf06a, #22b544);
+}
+.toast-error {
+  background: linear-gradient(#ff7468, #dd2f2f);
+}
+.toast-info {
+  background: linear-gradient(#5fbaff, #2a7ff0);
+}
+
+/* Imperative effects (ui/fx.js) */
+.fx-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+}
+.gain-pop {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: calc(54px * var(--ui-scale));
+  animation: gain-pop 1.15s ease-out forwards;
+}
+.gain-pop svg {
+  width: 1.15em;
+  height: 1em;
+}
+.gain-pop.boosted span {
+  color: #ffe27a;
+}
+@keyframes gain-pop {
+  0% {
+    transform: scale(0.3);
+    opacity: 0;
+  }
+  14% {
+    transform: scale(1.18);
+    opacity: 1;
+  }
+  24% {
+    transform: scale(1);
+  }
+  72% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-46px) scale(0.92);
+    opacity: 0;
+  }
+}
+.reward-pop {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  font-size: calc(80px * var(--ui-scale));
+  white-space: nowrap;
+  animation: reward-pop 1.7s ease-out forwards;
+}
+.reward-wins {
+  color: #ffe36e;
+}
+.reward-reward {
+  color: #8fffa0;
+}
+@keyframes reward-pop {
+  0% {
+    transform: translate(-50%, -50%) scale(0.2);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, -50%) scale(1.15);
+    opacity: 1;
+  }
+  24% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -170%);
+    opacity: 0;
+  }
+}
+/* Stunt label: the trick's name in gradient letters over a spinning burst,
+   with a combo tag when tricks are chained. */
+.trick-pop {
+  position: absolute;
+  left: 50%;
+  top: 27%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: calc(66px * var(--hud-scale));
+  white-space: nowrap;
+  pointer-events: none;
+  animation: trick-pop 1.05s cubic-bezier(0.2, 0.9, 0.3, 1) forwards;
+}
+.trick-burst {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  z-index: -1;
+  width: 4.2em;
+  height: 4.2em;
+  border-radius: 50%;
+  translate: -50% -50%;
+  background: repeating-conic-gradient(var(--c1) 0deg 9deg, transparent 9deg 22deg);
+  -webkit-mask: radial-gradient(circle, #000 18%, transparent 68%);
+  mask: radial-gradient(circle, #000 18%, transparent 68%);
+  opacity: 0.6;
+  animation: trick-burst 1.05s linear forwards;
+}
+.trick-name {
+  position: relative;
+  font-family: 'Luckiest Guy', 'Fredoka', system-ui, sans-serif;
+  letter-spacing: 0.05em;
+  color: var(--ink);
+  -webkit-text-stroke: 0.22em var(--ink);
+  text-shadow: 0 0.12em 0 var(--ink);
+}
+.trick-name::after {
+  content: attr(data-text);
+  position: absolute;
+  inset: 0;
+  -webkit-text-stroke: 0;
+  text-shadow: none;
+  background: linear-gradient(#ffffff 8%, var(--c1) 42%, var(--c2) 92%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.trick-combo {
+  margin-top: 0.12em;
+  padding: 0.06em 0.55em 0.1em;
+  border: 0.07em solid var(--ink);
+  border-radius: 999px;
+  background: linear-gradient(var(--c1), var(--c2));
+  box-shadow: 0 0.08em 0 var(--ink);
+  color: #fff;
+  font: 700 0.38em 'Fredoka', system-ui, sans-serif;
+  -webkit-text-stroke: 0.14em var(--ink);
+  paint-order: stroke fill;
+}
+@keyframes trick-pop {
+  0% {
+    transform: translate(-50%, -50%) rotate(calc(var(--tilt) - 12deg)) scale(0.2);
+    opacity: 0;
+  }
+  14% {
+    transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1.22);
+    opacity: 1;
+  }
+  24% {
+    transform: translate(-50%, -50%) rotate(var(--tilt)) scale(0.94);
+  }
+  32% {
+    transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1.04);
+  }
+  40% {
+    transform: translate(-50%, -50%) rotate(var(--tilt)) scale(1);
+  }
+  74% {
+    transform: translate(-50%, -55%) rotate(var(--tilt)) scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -120%) rotate(var(--tilt)) scale(0.86);
+    opacity: 0;
+  }
+}
+@keyframes trick-burst {
+  from {
+    rotate: 0deg;
+    scale: 0.4;
+  }
+  30% {
+    scale: 1;
+  }
+  to {
+    rotate: 70deg;
+    scale: 1.15;
+  }
+}
+
+/* "Press E" on a bike stand */
+.bike-prompt {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 22px 8px 8px;
+  translate: -50% 0;
+  border: 4px solid var(--ink);
+  border-radius: 999px;
+  background: linear-gradient(rgba(36, 44, 66, 0.94), rgba(18, 22, 36, 0.94));
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
+  animation: prompt-in 0.25s ease-out;
+}
+.bike-prompt.is-active {
+  background: linear-gradient(#5fe08a, #2fb14f);
+}
+.bike-prompt-key {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 4px solid var(--ink);
+  border-radius: 12px;
+  background: linear-gradient(#ffffff, #dce3ee);
+  box-shadow: 0 4px 0 var(--ink);
+  color: #15151d;
+  font: 800 24px 'Fredoka', system-ui, sans-serif;
+}
+.bike-prompt.is-active .bike-prompt-key {
+  animation: key-bob 0.9s ease-in-out infinite;
+}
+@keyframes prompt-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.9);
+  }
+}
+@keyframes key-bob {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+/* Total Speed nudges up each time it grows */
+.stat-bump {
+  display: inline-block;
+  animation: stat-bump 0.28s ease-out;
+}
+@keyframes stat-bump {
+  40% {
+    transform: scale(1.08);
+    color: #fff47a;
+  }
+}
+
+
+.screen-flash {
+  position: absolute;
+  inset: 0;
+  animation: flash 0.75s ease-out forwards;
+}
+.flash-death {
+  background: radial-gradient(ellipse at center, rgba(255, 0, 0, 0) 25%, rgba(255, 25, 25, 0.7) 100%);
+}
+.flash-teleport {
+  background: radial-gradient(ellipse at center, rgba(255, 255, 255, 0.9), rgba(150, 215, 255, 0.65));
+}
+@keyframes flash {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+/* ------------------------------------------------------------------------ */
+/* Panels                                                                    */
+/* ------------------------------------------------------------------------ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  background: rgba(5, 10, 20, 0.35);
+}
+.panel {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 94vw);
+  max-height: 84vh;
+  overflow: hidden;
+  border: 6px solid var(--ink);
+  border-radius: 24px;
+  background: #eef3fb;
+  box-shadow: 0 10px 0 rgba(0, 0, 0, 0.35);
+  animation: panel-in 0.24s cubic-bezier(0.2, 1.4, 0.5, 1);
+}
+@keyframes panel-in {
+  from {
+    transform: scale(0.7);
+    opacity: 0;
+  }
+}
+.panel-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 80px 14px 22px;
+  border-bottom: 5px solid var(--ink);
+  font-size: 44px;
+}
+.panel-close {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  display: grid;
+  place-items: center;
+  width: 54px;
+  height: 54px;
+  transform: translateY(-50%);
+  color: #fff;
+  font-size: 30px;
+  font-weight: 800;
+}
+.panel-body {
+  overflow-y: auto;
+  padding: 18px;
+}
+.tabs {
+  display: flex;
+  gap: 10px;
+  padding: 12px 18px 0;
+}
+.tab {
+  padding: 6px 22px;
+  border: 4px solid var(--ink);
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+  font-size: 24px;
+}
+
+.card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 10px;
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+.card.is-equipped {
+  background: #e9ffe9;
+  outline: 4px solid #2fcf4a;
+  outline-offset: -10px;
+}
+.card.is-highlight {
+  animation: highlight 1.2s ease-in-out infinite;
+}
+@keyframes highlight {
+  50% {
+    box-shadow:
+      0 0 0 6px #ffd23a,
+      0 5px 0 rgba(0, 0, 0, 0.18);
+  }
+}
+.card-button {
+  width: 100%;
+  padding: 6px 8px;
+  color: #fff;
+  font-size: 20px;
+  border-radius: 10px !important;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 10px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.progress-mini {
+  position: relative;
+  width: 100%;
+  height: 26px;
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: #d8deea;
+}
+.progress-mini > div {
+  height: 100%;
+  background: linear-gradient(#7cf37c, #2fbf4a);
+  transition: width 0.3s;
+}
+
+/* ------------------------------------------------------------------------ */
+/* Menu                                                                      */
+/* ------------------------------------------------------------------------ */
+
+/* Loading screen: counts to 100 and fades into the game. */
+.loading-screen {
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 40%, #6fd0ff 0%, #2f8cff 45%, #1d3fb8 100%);
+  transition: opacity 0.6s ease;
+}
+.loading-screen.loading-out {
+  opacity: 0;
+  pointer-events: none;
+}
+.loading-rays {
+  position: absolute;
+  left: 50%;
+  top: 40%;
+  width: 260vmax;
+  height: 260vmax;
+  translate: -50% -50%;
+  background: repeating-conic-gradient(rgba(255, 255, 255, 0.09) 0deg 10deg, rgba(255, 255, 255, 0) 10deg 20deg);
+  animation: loading-spin 40s linear infinite;
+}
+@keyframes loading-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+.loading-bike {
+  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.25));
+  animation: loading-hop 0.9s ease-in-out infinite;
+}
+@keyframes loading-hop {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  35% {
+    transform: translateY(-34px) rotate(-12deg);
+  }
+  60% {
+    transform: translateY(-20px) rotate(6deg);
+  }
+}
+.loading-bar {
+  position: relative;
+  width: 620px;
+  height: 40px;
+  overflow: hidden;
+  border: 5px solid var(--ink);
+  border-radius: 999px;
+  background: rgba(10, 20, 50, 0.45);
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+}
+.loading-fill {
+  height: 100%;
+  border-radius: 999px;
+  background:
+    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.22) 0 14px, rgba(255, 255, 255, 0) 14px 28px),
+    linear-gradient(#b6ff7a, #3fd14a 60%, #25a83a);
+  background-size: 40px 40px, 100% 100%;
+  animation: loading-stripes 0.7s linear infinite;
+}
+@keyframes loading-stripes {
+  to {
+    background-position: 40px 0, 0 0;
+  }
+}
+.loading-shine {
+  position: absolute;
+  inset: 4px 10px auto;
+  height: 9px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.35);
+}
+.logo-small {
+  font-size: 54px;
+  color: #ffe23a;
+  transform: rotate(-3deg);
+}
+.logo-big {
+  font-size: 110px;
+  line-height: 0.95;
+  color: #ffb21f;
+  transform: rotate(-3deg);
+}
+
+
+/* Touch controls */
+.joystick {
+  position: fixed;
+  bottom: 40px;
+  left: 40px;
+  z-index: 25;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: rgba(20, 24, 34, 0.35);
+  border: 4px solid rgba(255, 255, 255, 0.5);
+  touch-action: none;
+}
+.joystick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 66px;
+  height: 66px;
+  margin: -33px 0 0 -33px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.85);
+  border: 4px solid var(--ink);
+}
+.jump-touch {
+  position: fixed;
+  right: 40px;
+  bottom: 60px;
+  z-index: 25;
+  display: grid;
+  place-items: center;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: rgba(20, 24, 34, 0.45);
+  border: 4px solid rgba(255, 255, 255, 0.8);
+  color: #fff;
+  font-size: 54px;
   touch-action: none;
 }

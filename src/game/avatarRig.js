@@ -1,6 +1,7 @@
-import { NearestFilter, Quaternion, Vector3 } from 'three'
+import { Matrix4, NearestFilter, Quaternion, Vector3 } from 'three'
 
 import { BACK_BONE, HAT_BONE, NECK_OFFSET_BONE, PART_SLOTS } from '../bloxity/avatarAssets'
+import { applyAim, computeRiderPose, createRiderPose } from './rider/riderPose'
 
 /**
  * Rig manipulation for the base `player.glb` character.
@@ -106,6 +107,8 @@ export function collectRig(root) {
       /** Local axis to rotate about for lateral sway. */
       entry.axisZ = new Vector3(0, 0, 1).applyQuaternion(relInv).normalize()
     }
+
+    collectAimData(root, rig, rootQuatInv)
 
     rig.hatBone = skeleton.bones.find((b) => b.name === HAT_BONE) || null
     rig.backBone = skeleton.bones.find((b) => b.name === BACK_BONE) || null
@@ -324,13 +327,100 @@ const swing = (rig, name, angle) => rotateBone(rig, name, 'axisX', angle)
 /** Sway a limb out to the side. */
 const sway = (rig, name, angle) => rotateBone(rig, name, 'axisZ', angle)
 
+const _riderPose = createRiderPose()
+
+/**
+ * Bones the riding pose drives, parents before children, and which pose
+ * direction each one aims along (null = keep its rest rotation).
+ */
+const RIDE_CHAIN = [
+  ['Spine1', (p) => p.spine],
+  ['Spine2', null],
+  ['Neck_Offset', null],
+  ['Neck1', (p) => p.neck],
+  ['ArmL_Offset', null],
+  ['ArmL1', (p) => p.armL.upper],
+  ['ArmL2', (p) => p.armL.lower],
+  ['ArmR_Offset', null],
+  ['ArmR1', (p) => p.armR.upper],
+  ['ArmR2', (p) => p.armR.lower],
+  ['LegL_Offset', null],
+  ['LegL1', (p) => p.legL.upper],
+  ['LegL2', (p) => p.legL.lower],
+  ['LegR_Offset', null],
+  ['LegR1', (p) => p.legR.upper],
+  ['LegR2', (p) => p.legR.lower],
+]
+
+/** Where each aimed bone's segment points at bind pose (towards its child). */
+const SEGMENT_CHILD = {
+  Spine1: 'Spine2',
+  Neck1: 'Neck1_leaf',
+  ArmL1: 'ArmL2',
+  ArmL2: 'ArmL2_leaf',
+  ArmR1: 'ArmR2',
+  ArmR2: 'ArmR2_leaf',
+  LegL1: 'LegL2',
+  LegL2: 'LegL2_leaf',
+  LegR1: 'LegR2',
+  LegR2: 'LegR2_leaf',
+}
+
+/**
+ * Records, in the character's own space, each riding bone's bind rotation, its
+ * parent's bind rotation and its segment direction. The IK pose is applied
+ * against these, so it doesn't matter how the rig's local axes are oriented.
+ */
+function collectAimData(root, rig, rootQuatInv) {
+  const rootInv = new Matrix4().copy(root.matrixWorld).invert()
+  const posOf = (node) => node.getWorldPosition(new Vector3()).applyMatrix4(rootInv)
+  const quatOf = (node) => rootQuatInv.clone().multiply(node.getWorldQuaternion(new Quaternion()))
+  for (const [name] of RIDE_CHAIN) {
+    const entry = rig.bones[name]
+    if (!entry) continue
+    entry.bindQ = quatOf(entry.bone)
+    entry.parentBindQ = entry.bone.parent ? quatOf(entry.bone.parent) : new Quaternion()
+    const child = SEGMENT_CHILD[name] && root.getObjectByName(SEGMENT_CHILD[name])
+    if (child) {
+      const dir = posOf(child).sub(posOf(entry.bone))
+      if (dir.lengthSq() > 1e-8) entry.segDir = dir.normalize()
+    }
+  }
+  rig.canRide = RIDE_CHAIN.every(([name, aim]) => !aim || rig.bones[name]?.segDir)
+}
+
+const _charQ = new Map()
+
+/**
+ * Seated on the bike: feet on the pedals, hands on the grips, leaning forward
+ * (see riderPose.js). `motion.pedal` is the crank angle, so the legs pedal in
+ * step with the bike.
+ */
+function poseRider(rig, motion) {
+  if (!rig.canRide) return
+  const pose = computeRiderPose(motion, _riderPose)
+  _charQ.clear()
+  for (const [name, aim] of RIDE_CHAIN) {
+    const entry = rig.bones[name]
+    if (!entry) continue
+    const bone = entry.bone
+    const parentQ = _charQ.get(bone.parent?.name) ?? entry.parentBindQ
+    let q = entry.charQ
+    if (!q) q = entry.charQ = new Quaternion()
+    if (aim) applyAim(bone, parentQ, entry.bindQ, entry.segDir, aim(pose), q)
+    else q.copy(parentQ).multiply(bone.quaternion)
+    _charQ.set(name, q)
+  }
+}
+
 /**
  * Poses the rig for the current motion state.
  *
  * @param {object} rig from `collectRig`
- * @param {{ time: number, speed: number, grounded: boolean, maxSpeed: number }} motion
+ * @param {{ time: number, speed: number, grounded: boolean, maxSpeed: number, riding?: boolean, pedal?: number }} motion
  *   `speed` is horizontal speed in world units/sec; `maxSpeed` is what counts as a
  *   full-amplitude run, so the cycle scales smoothly from a walk to a sprint.
+ *   With `riding` set the character sits on a bike instead.
  */
 export function animateRig(rig, motion) {
   if (!rig?.skeleton || !motion) return
@@ -339,6 +429,11 @@ export function animateRig(rig, motion) {
   const ratio = Math.min(speed / Math.max(maxSpeed, 0.001), 1)
 
   rig.root.position.y = rig.rootRestY
+
+  if (motion.riding) {
+    poseRider(rig, motion)
+    return
+  }
 
   // --- Airborne: tuck the legs, throw the arms up ---------------------------
   if (!grounded) {

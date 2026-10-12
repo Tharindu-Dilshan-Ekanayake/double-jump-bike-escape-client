@@ -1,0 +1,256 @@
+import { useState } from 'react'
+
+import {
+  AURAS,
+  BIKES,
+  bikeAvailable,
+  PRODUCTS,
+  TRAILS,
+  TRAIN_PADS,
+  TRAIN_PAD_BY_ID,
+  bikeSpeedFor,
+  bikeSpeedUpgradeCost,
+  formatNumber,
+  parseList,
+} from '../../shared/gameData.js'
+import { BikeIcon } from '../icons'
+import { Grid, Modal, OwnButton, Price, Tabs } from './Modal'
+import { action } from './actions'
+
+const owns = (me, cat, id) => parseList(me.owned).includes(`${cat}:${id}`)
+
+/* ---------------------------------------------------------------------------
+ * Item shop: trails + auras
+ * ------------------------------------------------------------------------- */
+
+function TrailPreview({ colors }) {
+  if (!colors.length) return <div className="grid h-[70px] w-full place-items-center text-[40px]">🚫</div>
+  return (
+    <div
+      className="h-[70px] w-full rounded-full border-4 border-[#15151d]"
+      style={{ background: `linear-gradient(90deg, ${colors.join(', ')})`, boxShadow: `0 0 18px ${colors[0]}` }}
+    />
+  )
+}
+
+function AuraPreview({ color, none }) {
+  if (none) return <div className="grid h-[86px] place-items-center text-[40px]">🚫</div>
+  return (
+    <div
+      className="h-[86px] w-[86px] rounded-full border-4 border-[#15151d]"
+      style={{ background: `radial-gradient(circle, #ffffff 0%, ${color} 45%, ${color}00 72%)`, boxShadow: `0 0 26px ${color}` }}
+    />
+  )
+}
+
+export function ItemsPanel({ me, props }) {
+  const [tab, setTab] = useState(props.tab || 'trails')
+  const tabs = <Tabs tabs={[['trails', '☄️ Trails'], ['auras', '🔮 Auras']]} value={tab} onChange={setTab} color="#2fb5ff" />
+  return (
+    <Modal title="Item Shop" icon="🛒" color="#2fb5ff" tabs={tabs}>
+      {tab === 'trails' ? (
+        <Grid>
+          {TRAILS.map((trail) => (
+            <div key={trail.id} className={`card ${me.trail === trail.id ? 'is-equipped' : ''}`}>
+              <TrailPreview colors={trail.colors} />
+              <div className="ink-text text-[22px] font-bold">{trail.name}</div>
+              <div className="chip bg-[#e6ffe9] text-[#1d7a2f]">+{Math.round(trail.bonus * 100)}% Speed</div>
+              <OwnButton
+                me={me}
+                owned={owns(me, 'trail', trail.id)}
+                equipped={me.trail === trail.id}
+                currency="wins"
+                price={trail.price}
+                onBuy={action('buy', { cat: 'trail', id: trail.id })}
+                onEquip={action('equip', { cat: 'trail', id: trail.id })}
+              />
+            </div>
+          ))}
+        </Grid>
+      ) : (
+        <Grid>
+          {AURAS.map((aura) => (
+            <div
+              key={aura.id}
+              className={`card ${me.aura === aura.id ? 'is-equipped' : ''} ${props.highlight === aura.id ? 'is-highlight' : ''}`}
+            >
+              <AuraPreview color={aura.color} none={aura.id === 'none'} />
+              <div className="ink-text text-[22px] font-bold">{aura.name}</div>
+              <div className="chip bg-[#fff6d6] text-[#9a6a00]">{aura.winsMult}x Wins</div>
+              <OwnButton
+                me={me}
+                owned={owns(me, 'aura', aura.id)}
+                equipped={me.aura === aura.id}
+                currency={aura.currency}
+                price={aura.price}
+                onBuy={action('buy', { cat: 'aura', id: aura.id })}
+                onEquip={action('equip', { cat: 'aura', id: aura.id })}
+              />
+            </div>
+          ))}
+        </Grid>
+      )}
+    </Modal>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * Bikes
+ * ------------------------------------------------------------------------- */
+
+/** The best speed multiplier among the bikes a player owns. */
+function bestOwnedMult(me) {
+  return BIKES.filter((b) => owns(me, 'bike', b.id)).reduce((max, b) => Math.max(max, b.mult), 1)
+}
+
+export function BikeCard({ me, bike, highlight }) {
+  const locked = !bikeAvailable(bike, me)
+  const best = bestOwnedMult(me)
+  const faster = bike.mult > best ? Math.round((bike.mult / best - 1) * 100) : 0
+  return (
+    <div className={`card ${me.bike === bike.id ? 'is-equipped' : ''} ${highlight ? 'is-highlight' : ''}`}>
+      <BikeIcon frame={bike.frame} rim={bike.rim} accent={bike.accent} size={120} />
+      <div className="ink-text text-[22px] font-bold">{bike.name}</div>
+      <div className="chip bg-[#e6f3ff] text-[#1d5aa8]">{formatNumber(bike.mult)}x Speed</div>
+      {faster > 0 && !owns(me, 'bike', bike.id) && <div className="ink-text text-[14px] font-bold text-[#2fbf4a]">{formatNumber(faster)}% faster than your best bike!</div>}
+      {locked ? (
+        <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
+          🔒 WORLD 2
+        </button>
+      ) : (
+      <OwnButton
+        me={me}
+        owned={owns(me, 'bike', bike.id)}
+        equipped={me.bike === bike.id}
+        currency={bike.currency}
+        price={bike.price}
+        onBuy={action('buy', { cat: 'bike', id: bike.id })}
+        onEquip={action('equip', { cat: 'bike', id: bike.id })}
+      />
+      )}
+    </div>
+  )
+}
+
+function BikeSpeedCard({ me }) {
+  const cost = bikeSpeedUpgradeCost(me.bikeUpg)
+  const speed = bikeSpeedFor(me.level, me.bikeUpg)
+  return (
+    <div className="card mb-4 flex-row justify-between gap-4 px-5 text-left">
+      <div className="text-[64px]">✏️</div>
+      <div className="flex-1">
+        <div className="ink-text text-[26px] font-bold">Max Bike Speed</div>
+        <div className="game-text text-[38px] text-[#7fc4ff]">
+          {speed} → {speed + 1}
+        </div>
+        <div className="ink-text text-[16px] opacity-70">Levels add +3 each. Upgrades are permanent.</div>
+      </div>
+      <div className="w-[170px]">
+        <OwnButton me={me} currency="wins" price={cost} onBuy={action('buy', { cat: 'bikeSpeed' })} buyLabel={<>+1 Speed · <Price currency="wins" value={cost} /></>} />
+      </div>
+    </div>
+  )
+}
+
+export function BikeSpeedPanel({ me }) {
+  return (
+    <Modal title="Bike Speed" icon="✏️" color="#4fa8ff" width="min(640px, 94vw)">
+      <BikeSpeedCard me={me} />
+    </Modal>
+  )
+}
+
+export function WinsShopPanel({ me }) {
+  return (
+    <Modal title="Wins Shop" icon="🏆" color="#35c95a">
+      <BikeSpeedCard me={me} />
+      <Grid>
+        {BIKES.filter((b) => b.shop === 'wins' || (b.shop === 'w2' && bikeAvailable(b, me))).map((bike) => (
+          <BikeCard key={bike.id} me={me} bike={bike} />
+        ))}
+      </Grid>
+    </Modal>
+  )
+}
+
+/* ---------------------------------------------------------------------------
+ * Shop: passes, speed packs and treadmills, all paid in Wins
+ * ------------------------------------------------------------------------- */
+
+function ProductCard({ me, id, icon, note, highlight }) {
+  const product = PRODUCTS[id]
+  const owned = (id === 'pass2xSpeed' || id === 'pass2xWins') && me[id]
+  return (
+    <div className={`card ${owned ? 'is-equipped' : ''} ${highlight ? 'is-highlight' : ''}`}>
+      <div className="text-[54px]">{icon}</div>
+      <div className="ink-text text-[22px] font-bold">{product.name}</div>
+      {note && <div className="ink-text text-[15px] opacity-70">{note}</div>}
+      {owned ? (
+        <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
+          OWNED
+        </button>
+      ) : (
+        <OwnButton me={me} currency="wins" price={product.price} onBuy={action('buy', { cat: 'product', id })} />
+      )}
+    </div>
+  )
+}
+
+export function ShopPanel({ me, props }) {
+  return (
+    <Modal title="Shop" icon="🏆" color="#35c95a">
+      <h3 className="game-text mb-2 text-[28px]">Passes</h3>
+      <Grid>
+        <ProductCard me={me} id="pass2xSpeed" icon="⚡" note="Double every speed gain" highlight={props.highlight === 'pass2xSpeed'} />
+        <ProductCard me={me} id="pass2xWins" icon="🏆" note="Unlocks the purple 2x Wins pads" highlight={props.highlight === 'pass2xWins'} />
+      </Grid>
+      <h3 className="game-text mb-2 mt-5 text-[28px]">Speed Packs</h3>
+      <Grid min={150}>
+        {['speed100', 'speed1k', 'speed10k', 'speed100k'].map((id) => (
+          <ProductCard key={id} me={me} id={id} icon="👟" />
+        ))}
+      </Grid>
+      <h3 className="game-text mb-2 mt-5 text-[28px]">Training Pads</h3>
+      <Grid min={150}>
+        {TRAIN_PADS.filter((p) => p.wins).map((pad) => (
+          <PadCard key={pad.id} me={me} pad={pad} />
+        ))}
+      </Grid>
+      <div className="card mt-5 items-start text-left">
+        <div className="ink-text text-[22px] font-bold">🏆 Earning Wins</div>
+        <div className="ink-text text-[17px]">
+          Land on a stage's Return pad, claim the daily 📅 reward, open the Group Chest, finish quests 📜 and try codes 🎟️.
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function PadCard({ me, pad }) {
+  const owned = parseList(me.padsOwned).includes(pad.id)
+  return (
+    <div className={`card ${owned ? 'is-equipped' : ''}`}>
+      <div className="h-[50px] w-full rounded-xl border-4 border-[#15151d]" style={{ background: pad.color }} />
+      <div className="ink-text text-[20px] font-bold">{pad.label}</div>
+      <div className="chip bg-[#e6f3ff] text-[#1d5aa8]">{formatNumber(pad.mult)}x Speed</div>
+      {owned ? (
+        <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
+          UNLOCKED
+        </button>
+      ) : (
+        <OwnButton me={me} currency="wins" price={pad.wins} onBuy={action('buy', { cat: 'pad', id: pad.id })} />
+      )}
+    </div>
+  )
+}
+
+export function PadPanel({ me, props }) {
+  const pad = TRAIN_PAD_BY_ID[props.pad]
+  if (!pad) return null
+  return (
+    <Modal title={`${pad.label} Pad`} icon="⚡" color="#ffb21f" width="min(420px, 94vw)">
+      <PadCard me={me} pad={pad} />
+      <p className="ink-text mt-3 text-center text-[18px]">Ride on this pad to gain {formatNumber(pad.mult)}x speed.</p>
+    </Modal>
+  )
+}
