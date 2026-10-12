@@ -13,6 +13,23 @@ export function TrophyIcon(props) {
   )
 }
 
+/** Rebirth: two pink arrows swirling round a blue core on a white disc. */
+export function RebirthIcon(props) {
+  return (
+    <svg viewBox="0 0 64 64" {...props}>
+      <circle cx="32" cy="32" r="27" fill="#ffffff" stroke="#15151d" strokeWidth="4" />
+      <g fill="none" stroke="#ff3f78" strokeWidth="7" strokeLinecap="round">
+        <path d="M14 32A18 18 0 0 1 41 16.4" />
+        <path d="M50 32A18 18 0 0 1 23 47.6" />
+      </g>
+      <path d="M47.1 19.9 36.1 22.8 44.1 9z" fill="#ff3f78" stroke="#ff3f78" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M16.9 44.1 27.9 41.2 19.9 55z" fill="#ff3f78" stroke="#ff3f78" strokeWidth="1.5" strokeLinejoin="round" />
+      <circle cx="32" cy="32" r="9" fill="#36c9ff" stroke="#15151d" strokeWidth="3" />
+      <circle cx="29" cy="29" r="3" fill="#ffffff" />
+    </svg>
+  )
+}
+
 export function BikeIcon({ frame = '#2b2f3a', rim = '#f6d33c', accent = '#ffffff', size = 96 }) {
   return (
     <svg viewBox="0 0 120 80" width={size} height={(size * 80) / 120}>

@@ -5,6 +5,8 @@ import { Vector3 } from 'three'
 import { sound } from '../audio/sound'
 import { chatBubbles, mySessionId, send } from '../net/connection'
 import {
+  DOUBLE_PAD_WINS,
+  canUseDoublePad,
   PHYSICS,
   TRAIN_PAD_BY_ID,
   bikeSpeedFor,
@@ -285,7 +287,7 @@ export function LocalPlayer() {
       sound.death()
       flashScreen('death')
       burst(_probe.set(x, y + 2, z), { color: fell ? '#ffb21f' : '#ff4040', count: 40, speed: 12, up: 8, life: 0.9, gravity: 18 })
-      store.toast(fell ? 'You fell! Back to the lobby!' : 'Oops! Back to the start!', 'error', 1800)
+      store.toast(fell ? '😵 You fell! Back to the lobby!' : 'Oops! Back to the start!', 'error', 1800)
       useGameStore.setState({ jump: null })
       return
     }
@@ -299,9 +301,11 @@ export function LocalPlayer() {
       if (pad && !c.teleportAt) {
         sendMoveNow(c)
         send('pad', { stage: pad.stage, kind: pad.kind })
-        if (pad.kind === 'return' || store.me?.pass2xWins) {
+        if (pad.kind === 'return' || canUseDoublePad(store.me)) {
           c.teleportAt = now + 0.35
           sound.whoosh()
+        } else {
+          store.toast(`Hold ${DOUBLE_PAD_WINS} Wins to use the 2x pad!`, 'info', 2200)
         }
       }
     }
