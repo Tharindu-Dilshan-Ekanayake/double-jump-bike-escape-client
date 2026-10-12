@@ -4,8 +4,8 @@ import { useBloxity } from './bloxity/BloxityContext'
 import GameScene from './game/GameScene'
 import { avatarPayload, send } from './net/connection'
 import { useGameStore } from './store/gameStore'
+import AutoJoin from './ui/AutoJoin'
 import Hud from './ui/Hud'
-import LoadingScreen from './ui/LoadingScreen'
 import Panels from './ui/panels/Panels'
 import SpeedFx from './ui/SpeedFx'
 import TouchControls from './ui/TouchControls'
@@ -47,7 +47,7 @@ function App() {
       <Hud />
       <Panels />
       <TouchControls />
-      <LoadingScreen />
+      <AutoJoin />
     </div>
   )
 }

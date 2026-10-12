@@ -22,9 +22,11 @@ cp .env.example .env   # VITE_GAME_SLUG / VITE_GAME_ID for Bloxity
 npm run dev
 ```
 
-The page loads straight into the game: a 0–100 loading screen (fonts, Bloxity
-sign-in, 3D assets, the world, a lobby) and no Play button. A player signed in
-to Bloxity joins with their account, anyone else as a guest.
+The page loads straight into the lobby: no loading screen or Play button of
+its own. The Bloxity host page shows its loading screen (kept informed with
+`loadingStep`) and lifts it with `loadingEnd()` once the rider is in a lobby
+(`src/ui/AutoJoin.jsx`). A player signed in to Bloxity joins with their
+account, anyone else as a guest.
 
 On localhost the game joins `ws://localhost:2567`; `VITE_SERVER_URL` overrides
 that. Hosted on Bloxity it joins through the Legion matchmaker (see Hosting).
