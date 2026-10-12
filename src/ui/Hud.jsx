@@ -16,7 +16,7 @@ import {
 } from '../shared/gameData.js'
 import { gameState, useGameStore } from '../store/gameStore'
 import Chat from './Chat'
-import { TrophyIcon } from './icons'
+import { RebirthIcon, TrophyIcon } from './icons'
 import { BIKE_BY_ID } from '../shared/gameData.js'
 import { bikeStatus, rideBike } from './bikeAction'
 import { claimableQuests } from './panels/questStatus'
@@ -76,12 +76,12 @@ function Tile({ kind, emoji, label, alert, hotkey, onClick }) {
 function StatsColumn({ me }) {
   const canRebirth = me.level >= rebirthLevelFor(me.rebirths)
   return (
-    <div className="hud-scaled pointer-events-auto fixed left-3 top-1/2 flex -translate-y-[56%] flex-col gap-4">
+    <div className="hud-scaled hud-stats pointer-events-auto fixed left-3 top-1/2 flex -translate-y-[56%] flex-col gap-4">
       <StatPill icon={<TrophyIcon />} value={formatNumber(me.wins)} onPlus={open('winsShop')} />
       <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-9 pl-1">
         <Tile kind="trails" emoji="☄️" label="TRAILS" hotkey="T" onClick={open('items', { tab: 'trails' })} />
         <Tile kind="auras" emoji="🔮" label="AURAS" hotkey="U" onClick={open('items', { tab: 'auras' })} />
-        <Tile kind="rebirth" emoji="🔄" label="REBIRTH" hotkey="R" alert={canRebirth} onClick={open('rebirth')} />
+        <Tile kind="rebirth" emoji={<RebirthIcon width="68" height="68" />} label="Rebirth" hotkey="R" alert={canRebirth} onClick={open('rebirth')} />
         <Tile kind="inventory" emoji="🎒" label="INVENTORY" hotkey="I" onClick={open('inventory')} />
       </div>
     </div>

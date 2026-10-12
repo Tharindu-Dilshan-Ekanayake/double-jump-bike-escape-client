@@ -46,6 +46,8 @@ export function TouchControls() {
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
+        onLostPointerCapture={end}
+        onContextMenu={(e) => e.preventDefault()}
       >
         <div className="joystick-knob" style={{ transform: `translate(${knob.x}px, ${knob.y}px)` }} />
       </div>
@@ -58,6 +60,8 @@ export function TouchControls() {
         }}
         onPointerUp={releaseJump}
         onPointerCancel={releaseJump}
+        onLostPointerCapture={releaseJump}
+        onContextMenu={(e) => e.preventDefault()}
         aria-label="Jump"
       >
         ⏫

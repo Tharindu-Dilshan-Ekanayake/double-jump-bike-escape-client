@@ -14,7 +14,7 @@ let musicOn = false
 let lastGainSound = 0
 let lastChain = 0
 /** Background music sits well below the sound effects. */
-const MUSIC_VOLUME = 0.3
+const MUSIC_VOLUME = 0.12
 
 function ensure() {
   if (!ctx) {
@@ -164,9 +164,9 @@ export const sound = {
     const now = performance.now()
     if (now - lastChain < 60) return
     lastChain = now
-    const v = Math.min(0.035, 0.012 + speed * 0.0003)
-    noise({ dur: 0.025, vol: v, freq: 3200 + Math.random() * 600, q: 4 })
-    noise({ dur: 0.04, vol: v * 0.6, freq: 900, type: 'bandpass', q: 2, delay: 0.02 })
+    const v = Math.min(0.09, 0.04 + speed * 0.0006)
+    noise({ dur: 0.03, vol: v, freq: 3200 + Math.random() * 600, q: 4 })
+    noise({ dur: 0.04, vol: v * 0.8, freq: 900, type: 'bandpass', q: 2, delay: 0.02 })
   },
   /** Bicycle bell: two bright, ringing strikes. */
   bell() {

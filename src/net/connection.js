@@ -177,7 +177,8 @@ function wireRoom(r) {
 
   r.onMessage('reward', ({ wins }) => {
     spawnRewardPopup(`+${wins}`, 'wins')
-    rainWins(wins)
+    // Pads send you home right away: let the trophies rain once you're back in the lobby.
+    setTimeout(() => rainWins(wins), 900)
     sound.win()
   })
 
@@ -188,7 +189,7 @@ function wireRoom(r) {
       return
     }
     if (m.reward) spawnRewardPopup(describeReward(m.reward), 'reward')
-    if (m.reward?.wins) rainWins(m.reward.wins)
+    if (m.reward?.wins) setTimeout(() => rainWins(m.reward.wins), 300)
     if (m.toast) gameState().toast(m.toast, 'success')
     if (m.rebirth) sound.levelUp()
     else sound.buy()
