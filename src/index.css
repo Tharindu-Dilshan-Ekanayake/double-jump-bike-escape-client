@@ -1010,92 +1010,17 @@ button {
 /* Menu                                                                      */
 /* ------------------------------------------------------------------------ */
 
-/* Loading screen: counts to 100 and fades into the game. */
-.loading-screen {
-  overflow: hidden;
-  background:
-    radial-gradient(ellipse at 50% 40%, #6fd0ff 0%, #2f8cff 45%, #1d3fb8 100%);
-  transition: opacity 0.6s ease;
-}
-.loading-screen.loading-out {
-  opacity: 0;
-  pointer-events: none;
-}
-.loading-rays {
-  position: absolute;
-  left: 50%;
-  top: 40%;
-  width: 260vmax;
-  height: 260vmax;
-  translate: -50% -50%;
-  background: repeating-conic-gradient(rgba(255, 255, 255, 0.09) 0deg 10deg, rgba(255, 255, 255, 0) 10deg 20deg);
-  animation: loading-spin 40s linear infinite;
-}
-@keyframes loading-spin {
-  to {
-    rotate: 360deg;
-  }
-}
-.loading-bike {
-  filter: drop-shadow(0 8px 0 rgba(0, 0, 0, 0.25));
-  animation: loading-hop 0.9s ease-in-out infinite;
-}
-@keyframes loading-hop {
-  0%,
-  100% {
-    transform: translateY(0) rotate(0deg);
-  }
-  35% {
-    transform: translateY(-34px) rotate(-12deg);
-  }
-  60% {
-    transform: translateY(-20px) rotate(6deg);
-  }
-}
-.loading-bar {
-  position: relative;
-  width: 620px;
-  height: 40px;
-  overflow: hidden;
-  border: 5px solid var(--ink);
+/* Shown only while (re)joining fails or reconnects. */
+.connection-notice {
+  translate: -50% 0;
+  padding: 8px 24px 10px;
+  border: 4px solid var(--ink);
   border-radius: 999px;
-  background: rgba(10, 20, 50, 0.45);
-  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.3);
+  background: linear-gradient(rgba(36, 44, 66, 0.94), rgba(18, 22, 36, 0.94));
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.35);
+  font-size: 20px;
+  white-space: nowrap;
 }
-.loading-fill {
-  height: 100%;
-  border-radius: 999px;
-  background:
-    repeating-linear-gradient(-45deg, rgba(255, 255, 255, 0.22) 0 14px, rgba(255, 255, 255, 0) 14px 28px),
-    linear-gradient(#b6ff7a, #3fd14a 60%, #25a83a);
-  background-size: 40px 40px, 100% 100%;
-  animation: loading-stripes 0.7s linear infinite;
-}
-@keyframes loading-stripes {
-  to {
-    background-position: 40px 0, 0 0;
-  }
-}
-.loading-shine {
-  position: absolute;
-  inset: 4px 10px auto;
-  height: 9px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.35);
-}
-.logo-small {
-  font-size: 54px;
-  color: #ffe23a;
-  transform: rotate(-3deg);
-}
-.logo-big {
-  font-size: 110px;
-  line-height: 0.95;
-  color: #ffb21f;
-  transform: rotate(-3deg);
-}
-
-
 /* Touch controls */
 .joystick {
   position: fixed;

@@ -46,6 +46,10 @@ export function collectRig(root) {
     skinnedMeshes: [],
     /** Rest Y of the character root, so the run-cycle bob can return to it. */
     rootRestY: root.position.y,
+    /** bone name -> inverse of the bone's rest matrix in model space (accessory placement). */
+    restInverses: {},
+    /** Accessories moved onto their bone every frame (hand items, shoes). */
+    followers: [],
   }
 
   const meshBySlot = new Map(
@@ -109,6 +113,14 @@ export function collectRig(root) {
     }
 
     collectAimData(root, rig, rootQuatInv)
+
+    // Captured before any animation or proportions touch the bones. Accessory
+    // meshes are authored in model space, so these place them on their bones.
+    // (Not skeleton.boneInverses: the leaf bones' inverse binds are 90 degrees off.)
+    const modelInv = root.matrixWorld.clone().invert()
+    for (const bone of skeleton.bones) {
+      rig.restInverses[bone.name] = modelInv.clone().multiply(bone.matrixWorld).invert()
+    }
 
     rig.hatBone = skeleton.bones.find((b) => b.name === HAT_BONE) || null
     rig.backBone = skeleton.bones.find((b) => b.name === BACK_BONE) || null
@@ -229,6 +241,66 @@ export function attachAccessory(rig, kind, object) {
 
   bone.add(object)
   return object
+}
+
+/**
+ * Attaches a rest-pose accessory (hair, mask, neck, chest, waist, hand, shoes; see
+ * ACCESSORY_SLOTS). `container` is the character's parent, where hand items and
+ * shoes live so they follow the bone's position and rotation but not its scale.
+ * Returns the objects added, for removal on the next rebuild.
+ */
+export function attachRestAccessory(rig, slot, object, container) {
+  const added = []
+  const place = (obj, boneName, mirror) => {
+    const bone = rig.skeleton?.bones.find((b) => b.name === boneName)
+    if (!bone || !rig.restInverses[boneName]) return
+    const local = new Matrix4().makeTranslation(slot.origin[0], slot.origin[1], slot.origin[2])
+    if (mirror) local.premultiply(new Matrix4().makeScale(-1, 1, 1))
+    local.premultiply(rig.restInverses[boneName])
+    obj.traverse((child) => {
+      if (child.isMesh) child.castShadow = true
+    })
+    if (slot.inheritScale) {
+      local.decompose(obj.position, obj.quaternion, obj.scale)
+      bone.add(obj)
+    } else {
+      if (!container) return
+      container.add(obj)
+      rig.followers.push({ obj, bone, local })
+    }
+    added.push(obj)
+  }
+  place(object, slot.bone, false)
+  if (slot.mirrorBone) place(object.clone(), slot.mirrorBone, true)
+  return added
+}
+
+/** Forgets followers whose objects were removed. */
+export function dropFollowers(rig, objects) {
+  const gone = new Set(objects)
+  rig.followers = rig.followers.filter((f) => !gone.has(f.obj))
+}
+
+const _fm = new Matrix4()
+const _fInv = new Matrix4()
+const _fp = new Vector3()
+const _fq = new Quaternion()
+const _fs = new Vector3()
+const ONE = new Vector3(1, 1, 1)
+
+/**
+ * Moves hand items and shoes onto their bones (position and rotation, scale 1),
+ * in the container's space. Call every frame after posing the rig.
+ */
+export function updateFollowers(rig, container) {
+  if (!container || !rig.followers.length) return
+  container.updateWorldMatrix(true, false)
+  _fInv.copy(container.matrixWorld).invert()
+  for (const { obj, bone, local } of rig.followers) {
+    bone.updateWorldMatrix(true, false)
+    _fm.multiplyMatrices(_fInv, bone.matrixWorld).decompose(_fp, _fq, _fs)
+    _fm.compose(_fp, _fq, ONE).multiply(local).decompose(obj.position, obj.quaternion, obj.scale)
+  }
 }
 
 /**

@@ -5,13 +5,14 @@ import { Box3, MeshStandardMaterial, Vector3 } from 'three'
 import { clone as cloneSkeleton } from 'three/examples/jsm/utils/SkeletonUtils.js'
 
 import {
+  ACCESSORY_SLOTS,
   assetUrls,
   BASE_BODY_URL,
   isRealId,
   PART_SLOTS,
-  skinIdOrDefault,
+  skinTextureUrl,
 } from '../bloxity/avatarAssets'
-import { loadOBJ, loadPartGLB, loadTexture } from '../bloxity/avatarLoader'
+import { loadItemTexture, loadOBJ, loadPartGLB, loadTexture } from '../bloxity/avatarLoader'
 import { useBloxity } from '../bloxity/BloxityContext'
 import { DEFAULT_PROPORTIONS } from '../bloxity/store'
 import {
@@ -20,7 +21,10 @@ import {
   applyProportions,
   applySkin,
   attachAccessory,
+  attachRestAccessory,
   collectRig,
+  dropFollowers,
+  updateFollowers,
 } from './avatarRig'
 
 /**
@@ -42,7 +46,10 @@ function fallbackMotion(delta) {
  * two legs) sharing one skeleton. Assembly means, per equipped slot:
  *   - body parts  -> swap the matching mesh's geometry
  *   - hat / back  -> attach an OBJ to the Neck1 / Spine2 bone
- *   - skin        -> set one texture as the map on every skinned mesh
+ *   - hair, mask, neck, chest, waist -> an OBJ on its bone, placed by rest pose
+ *   - hand, shoes -> a mirrored pair that follows the hand / foot bones
+ *   - skin        -> one texture (face, shirt and pants drawn on) as the map on
+ *                    every skinned mesh
  *
  * Any slot that is unequipped or 404s leaves the base body's own part in place. The
  * whole thing re-assembles when `onAvatarChanged` / `onProportionsChanged` fire, so
@@ -75,6 +82,8 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
   const { game } = bloxity
   const { scene: baseScene } = useGLTF(BASE_BODY_URL)
   const [assembled, setAssembled] = useState(false)
+  // The fit group: hand items and shoes live here, beside the character.
+  const fitRef = useRef(null)
 
   // The GLTF cache hands back one shared scene. Clone via SkeletonUtils so this
   // instance gets an independent, still-working skeleton.
@@ -123,11 +132,8 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
     const jobs = []
 
     // Skin always loads - "0" is the fallback, since the base body has no baked map.
-    jobs.push(
-      loadTexture(assetUrls.skinTexture(skinIdOrDefault(equipped?.skinId))).then(
-        (texture) => ({ kind: 'skin', texture }),
-      ),
-    )
+    // With a face / shirt / pants worn it's the API's composite texture.
+    jobs.push(loadTexture(skinTextureUrl(equipped)).then((texture) => ({ kind: 'skin', texture })))
 
     // Body parts: fetch only real ids; a missing slot resets to the base geometry.
     for (const [slot, cfg] of Object.entries(PART_SLOTS)) {
@@ -153,8 +159,19 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
       const id = equipped?.[idKey]
       if (!isRealId(id)) continue
       jobs.push(
-        Promise.all([loadOBJ(meshUrl(id)), loadTexture(texUrl(id))]).then(
+        Promise.all([loadOBJ(meshUrl(id)), loadItemTexture(texUrl(id))]).then(
           ([object, texture]) => ({ kind: 'accessory', accessory: kind, object, texture }),
+        ),
+      )
+    }
+
+    // Hair, mask, neck, chest, waist, hand items and shoes.
+    for (const slot of Object.values(ACCESSORY_SLOTS)) {
+      const id = equipped?.[slot.idKey]
+      if (!isRealId(id)) continue
+      jobs.push(
+        Promise.all([loadOBJ(assetUrls.itemMesh(slot.dir, id)), loadItemTexture(assetUrls.itemTexture(slot.dir, id))]).then(
+          ([object, texture]) => ({ kind: 'restAccessory', slot, object, texture }),
         ),
       )
     }
@@ -180,6 +197,12 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
               }
               const added = attachAccessory(rig, result.accessory, result.object)
               if (added) attached.push(added)
+            } else if (result.kind === 'restAccessory' && result.object) {
+              const material = new MeshStandardMaterial({ map: result.texture ?? null })
+              result.object.traverse((child) => {
+                if (child.isMesh) child.material = material
+              })
+              attached.push(...attachRestAccessory(rig, result.slot, result.object, fitRef.current))
             }
           } catch (err) {
             console.warn(`[bloxity] failed to apply ${result.kind}`, err)
@@ -195,6 +218,7 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
 
     return () => {
       cancelled = true
+      dropFollowers(rig, attached)
       for (const object of attached) {
         object.parent?.remove(object)
         object.traverse((child) => child.geometry?.dispose())
@@ -215,6 +239,7 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
       // animation then rotates on top of that clean base.
       applyProportions(rig, proportionsRef.current)
       animateRig(rig, motionRef?.current ?? fallbackMotion(delta))
+      updateFollowers(rig, fitRef.current)
     } catch {
       // A malformed payload must not kill the render loop.
     }
@@ -229,7 +254,7 @@ export const PlayerAvatar = forwardRef(function PlayerAvatar(
     <group ref={ref} {...props}>
       {/* Fit scale lives on this wrapper, not on `character` - applyProportions
           overwrites the character's own scale every frame. */}
-      <group scale={fit.scale} position={[0, fit.footOffset, 0]}>
+      <group ref={fitRef} scale={fit.scale} position={[0, fit.footOffset, 0]}>
         <primitive object={character} />
       </group>
     </group>

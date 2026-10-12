@@ -80,8 +80,8 @@ function Lights({ shadowSize }) {
 }
 
 /**
- * Fires `onFirstFrame` after the renderer has actually drawn once.
- * `loadingEnd()` should mean "the player can see the game", not "React mounted".
+ * Fires `onFirstFrame` after the renderer has actually drawn once (the world is
+ * built and on screen; AutoJoin joins a lobby after that).
  */
 function FirstFrameSignal({ onFirstFrame }) {
   const fired = useRef(false)
@@ -98,7 +98,7 @@ export function GameScene() {
   const fontsReady = useFontsReady()
   const phase = useGameStore((s) => s.phase)
   const quality = useGameStore((s) => s.settings.quality)
-  const loadingEnded = useRef(false)
+  const firstFrame = useRef(false)
   // Render resolution: starts at the quality's maximum and steps down (or back
   // up) when the frame rate drops, so slower devices stay smooth.
   const maxDpr = Math.min(window.devicePixelRatio || 1, MAX_DPR[quality] ?? 1)
@@ -113,10 +113,9 @@ export function GameScene() {
   }, [game])
 
   const handleFirstFrame = () => {
-    if (loadingEnded.current) return
-    loadingEnded.current = true
+    if (firstFrame.current) return
+    firstFrame.current = true
     useGameStore.setState({ worldReady: true })
-    game.loadingEnd()
   }
 
   return (
