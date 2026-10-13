@@ -30,6 +30,8 @@ export const useGameStore = create((set, get) => ({
   canRetry: true,
   /** True once the 3D world has drawn its first frame. */
   worldReady: false,
+  /** The phone HUD layout (ui/phoneLayout.js), or null on tablets and computers. */
+  phone: null,
   /** When the current lobby was joined (each join fades the loading screen once). */
   joinedAt: 0,
   lobby: null,
