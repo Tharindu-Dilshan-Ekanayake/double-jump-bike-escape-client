@@ -3,11 +3,14 @@ import { useEffect } from 'react'
 import { sound } from '../../audio/sound'
 import { formatNumber } from '../../shared/gameData.js'
 import { shade } from '../../game/world/textures'
-import { gameState } from '../../store/gameStore'
+import { gameState, useGameStore } from '../../store/gameStore'
 import { CurrencyIcon } from '../icons'
 
 /** Chunky Roblox-style window with a coloured title bar and a red ✕. */
 export function Modal({ title, icon, color = '#3ba8ff', tabs, width, children }) {
+  // Phones: nearly full screen (see phoneLayout.js).
+  const phone = useGameStore((s) => s.phone)
+  const size = phone ? { width: phone.panel.width, maxHeight: phone.panel.height } : width ? { width } : undefined
   const close = () => {
     sound.click()
     gameState().closePanel()
@@ -27,7 +30,7 @@ export function Modal({ title, icon, color = '#3ba8ff', tabs, width, children })
         if (e.target === e.currentTarget) close()
       }}
     >
-      <div className="panel ui-scaled" style={width ? { width } : undefined}>
+      <div className="panel ui-scaled" style={size}>
         <div className="panel-header" style={{ background: `linear-gradient(${shade(color, 0.3)}, ${color})` }}>
           <span>{icon}</span>
           <span className="title-text">{title}</span>

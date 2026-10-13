@@ -57,7 +57,14 @@ key again closes the window.
 | Tab | Players in the lobby | V | ring the bike bell |
 | Esc | close a window | | |
 
-Phones get an on-screen joystick and a jump button. The daily reward is
+Phones play in landscape (held upright, a "Turn your phone sideways" screen
+covers the game) with their own compact HUD (`src/ui/PhoneHud.jsx`, sizes in
+`src/ui/phoneLayout.js`) that keeps the middle of the screen clear: Wins and
+four buttons on the left (Quests, Rebirth, Pets, Spin); 2X Speed, a ☰ menu
+(Trails, Auras, Inventory, Upgrade, Worlds, Settings, Music), the gift timer
+and the next bike on the right; the joystick bottom left, a round JUMP button
+bottom right and the level bar between them (its ⚡+ opens the speed packs).
+Windows fill most of a phone's screen. Tablets and computers keep the full HUD. The daily reward is
 collected automatically on your first join each day; codes are in Settings.
 The top left of the screen is left free for the Bloxity host page's own menu
 and chat; the top right shows who you're playing as.

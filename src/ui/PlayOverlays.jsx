@@ -118,7 +118,7 @@ export function DeathPrompt({ me }) {
   if (prompt) {
     return (
       <div className="death-dim pointer-events-auto fixed inset-0 z-[45] grid place-items-center">
-        <div className="hud-scaled">
+        <div className="overlay-scaled">
           <ContinueQuestion key={prompt.at} prompt={prompt} me={me} />
         </div>
       </div>
@@ -126,7 +126,7 @@ export function DeathPrompt({ me }) {
   }
   if (!gate) return null
   return (
-    <div key={gate.at} className="hud-scaled gate-card pointer-events-auto fixed left-1/2 top-[20%] z-[45]">
+    <div key={gate.at} className="overlay-scaled gate-card pointer-events-auto fixed left-1/2 top-[20%] z-[45]">
       <button type="button" className="gate-close press" aria-label="Close" onClick={() => useGameStore.setState({ gateFail: null })}>
         ✕
       </button>
@@ -182,7 +182,7 @@ export function HatchOverlay() {
   return (
     <div key={hatching.at} className="hatch-layer pointer-events-auto fixed inset-0 z-50 grid place-items-center" onClick={close}>
       {shown && <div className="rebirth-rays hatch-rays" style={{ '--rarity': color }} />}
-      <div className="hud-scaled relative flex flex-col items-center gap-2 text-center">
+      <div className="overlay-scaled relative flex flex-col items-center gap-2 text-center">
         {!shown ? (
           <>
             <div className="hatch-egg" style={{ '--egg-a': egg?.colors[0], '--egg-b': egg?.colors[1] }}>
@@ -203,7 +203,7 @@ export function HatchOverlay() {
               {pet?.rarity}
             </div>
             <div className="game-text text-[30px] text-[#7dff8a]">{pet && petBonusText(pet)}</div>
-            <div className="game-text mt-2 text-[18px] opacity-80">Tap to continue · Pets (P) to equip</div>
+            <div className="game-text mt-2 text-[18px] opacity-80">Tap to continue · equip it in Pets</div>
           </>
         )}
       </div>
