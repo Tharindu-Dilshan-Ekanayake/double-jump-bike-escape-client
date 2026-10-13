@@ -51,6 +51,7 @@ key again closes the window.
 | U | Auras | B | Bike Speed |
 | R | Rebirth | X | 2X Speed |
 | I | Inventory | M | Music on/off |
+| P | Pets | L | Lucky Spin |
 | 1–4 | Speed packs | 5 | Shop |
 | O | Settings | G | Worlds |
 | Tab | Players in the lobby | V | ring the bike bell |
@@ -78,11 +79,21 @@ and chat; the top right shows who you're playing as.
   you physically fall short. The gaps to stages 1–3 are clear; from the gap to
   stage 4 on, lasers bob up and down in them. Falling into the river or
   touching a laser sends you to the lobby.
+- **Falls**: if you fell into a gap your Speed is too low for, a card says
+  how much Speed the gate still needs and about how long your best treadmill
+  takes to earn it. Any other fall after reaching an island this run asks
+  "Continue?": one free continue a day puts you back on that island (records
+  don't count for the rest of that run). `src/game/ads.js` is the hook for a
+  rewarded-ad continue later; it is off until an ad provider is wired up and
+  `continue.rewardedAds` is set in `config/balance.ts`.
 - **Wins** are the only currency (stage pads, quests, daily reward, chest,
   codes). There is no premium currency.
-- **Rebirth** needs a Speed target (⚡160K for the first, then 1.9x more each
+- **Rebirth** needs a Speed target (⚡160K for the first, then 2x more each
   time). It resets Speed (so the gates close again) for one rebirth: a
-  permanent +50% Speed and faster treadmills (Rebirth 1+, 5+, 10+…). The
+  permanent +50% Speed, faster treadmills (Rebirth 1+, 5+, 10+…) and a few
+  Wins (60 for the first, 20 more each time). After escaping World 1 a bar
+  under the gift timer shows "Rebirth 3/10 to World 2" (a badge on the Rebirth
+  button on phones). The
   Rebirth window previews exactly what you get and what resets; rebirthing
   plays a full-screen celebration. Rebirths 5, 10 and 25 give exclusive bikes
   (Reborn, Eclipse, Ascended) that can't be bought.
@@ -97,10 +108,25 @@ and chat; the top right shows who you're playing as.
   Shop shows the next restock.
 - **Collecting**: bikes, trails and auras have rarities (Common to Mythic).
   The Bike Shop shows every bike spinning on a pedestal in its rarity colour,
-  labelled with how much faster it is than your best bike. There are 15 trails
-  and 15 auras to collect ("Collection X/30" in the Trails & Auras and
+  labelled with how much faster it is than your best bike. There are 16 trails
+  and 16 auras to collect, the Star ones included ("Collection X/32" in the Trails & Auras and
   Inventory windows). A bar under your Wins always shows progress to the next
   bike ("Dragon Bike 20/35 🏆").
+- **Pets** (P): eggs bought with Wins (Basic 150, Golden 2.5K, Cosmic 35K)
+  hatch a random pet by rarity, with a wobble-crack-reveal animation. Up to 3
+  equipped pets follow your bike (flyers hover, the rest hop); each gives
+  +Speed % or xWins (Wins pets add up: x1.2 and x1.15 make x1.35). "Equip best"
+  picks the strongest; spare pets can be released to make room (60 at most).
+  The Pet Index counts the 18 species you've hatched.
+- **Playtime gifts**: "🎁 Next gift in 04:12" under the round buttons; six
+  gifts at 5/10/15/25/40/60 minutes of each session (Wins, minutes' worth of
+  training Speed, a free Basic Egg), starting over every time you join.
+- **Lucky Spin** (L): a free spin every 10 minutes of playtime (it doesn't
+  charge while you're away) on a wheel of weighted prizes, from Wins and
+  training Speed to a 1% Cosmic Egg. The server picks the slot.
+- **Star rewards**: total stars from stage records unlock prizes once each
+  (5 ⭐ 100 Wins, 15 ⭐ Star Trail, 30 ⭐ Star Bike, 45 ⭐ Star Aura, 66 ⭐
+  25K Wins), listed in the Quests window. Star items are never sold.
 - **Stage records**: the timer starts when you ride out of the lobby. Landing
   on a stage shows your split, 1–3 stars against its par (riding flat out at
   the gate's top speed) and "NEW RECORD!" when you beat your best. Best stars
@@ -121,11 +147,14 @@ npm run check:climb    # proves every gate: its Speed clears the gap, 88% falls 
 ```
 
 With the current numbers a solo player reaches stages 1–2 in under a minute,
-stage 7 at about 33 minutes and rebirths for the first time at about 48;
-later lives take 12–35 minutes, World 1 is escaped at about 1:50 and World 2
-opens at about 3:50. One run of the newest stage pays 20–40% of the next bike,
-so players replay stages or train. The simulator's rider is tidy and solo, so
-real players land a little either side of these.
+stage 7 at about 34 minutes and rebirths for the first time at about 50
+(46–53 depending on egg and spin luck; the simulator runs 20 seeds and prints
+the spread). Later lives take 12–35 minutes, World 1 is escaped at about 1:52
+and World 2 opens at about 4:10. One run of the newest stage pays 20–45% of
+the next bike, so players replay stages or train. The simulator models the
+daily reward and quests, the chest, playtime gifts (a new session every hour),
+lucky spins, eggs (a few per tier), rebirth Wins and star rewards. Its rider
+is tidy and solo, so real players land a little either side of these.
 - **Riding feel**: speed lines pour out to both sides and the screen edges
   zoom-blur from where you're heading (WebGL, see `src/game/SpeedBlur.jsx`),
   with a burst on every jump; the camera widens with speed. Pedals turn with
@@ -164,11 +193,11 @@ rejoined the same way. The dev site reaches the dev game server automatically.
 | --- | --- |
 | `src/shared/` | Rules and the deterministic map. **Shared with the server**: after editing, run `npm run sync-shared` in the server repo. |
 | `src/game/world/` | Turns the layout into meshes: textures, scenery, signs, lasers |
-| `src/game/rider/` | Bikes, the riding pose (2-bone IK), tricks, trails, auras |
+| `src/game/rider/` | Bikes, the riding pose (2-bone IK), tricks, trails, auras, pets (`petModel.js`) |
 | `src/game/LocalPlayer.jsx` | Controller: input, physics, jumps, pads, triggers |
 | `src/game/physics.js` | Box collision with step-up and wall climbing |
 | `src/net/connection.js` | Colyseus connection and HUD state sync |
-| `src/ui/` | HUD (with its keyboard shortcuts), speed effects and all the windows (shops, inventory, quests…) |
+| `src/ui/` | HUD (with its keyboard shortcuts), speed effects and all the windows (shops, inventory, quests, pets, spin…); `PlayOverlays.jsx` has the hatch animation and the fall prompt |
 
 ## Checks
 

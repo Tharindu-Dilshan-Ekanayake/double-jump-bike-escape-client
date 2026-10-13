@@ -84,13 +84,14 @@ function RemotePlayer({ sid }) {
     })
     const crown = topSid === sid && p.totalSpeed > 0
     // The tag shows speed rounded (1.2K), so only re-render when that text changes.
-    const signature = `${p.name}|${p.bike}|${p.trail}|${p.aura}|${p.avatar}|${p.level}|${formatNumber(p.totalSpeed)}|${crown}`
+    const signature = `${p.name}|${p.bike}|${p.trail}|${p.aura}|${p.petsEquipped}|${p.avatar}|${p.level}|${formatNumber(p.totalSpeed)}|${crown}`
     if (signature !== state.signature) {
       state.signature = signature
       const avatar = parseAvatar(p.avatar)
       setLook({
         name: p.name,
         bike: p.bike,
+        pets: p.petsEquipped,
         trail: p.trail,
         aura: p.aura,
         equipped: avatar.equipped ?? null,

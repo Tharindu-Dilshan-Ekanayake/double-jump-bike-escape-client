@@ -1,6 +1,6 @@
 import { useFrame } from '@react-three/fiber'
 import { Component, Suspense, useEffect, useMemo, useRef } from 'react'
-import { Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from 'three'
+import { Group, Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from 'three'
 
 import { burst } from '../burst'
 import PlayerAvatar from '../PlayerAvatar'
@@ -9,6 +9,7 @@ import { textSprite } from '../world/signs'
 import { createBlockyAvatar } from './blockyAvatar'
 import { BIKE, createBike } from './bikeModel'
 import { AuraEffect, TireStreak, TrailRibbon } from './effects'
+import { createPet, petFlies } from './petModel'
 import { AVATAR_HEIGHT, AVATAR_OFFSET, AVATAR_SCALE, computeRiderPose, createRiderPose } from './riderPose'
 import { TRICKS, TRICK_DURATION, easeInOut, trickFor } from './tricks'
 
@@ -28,6 +29,46 @@ const TRICK_BY_ID = Object.fromEntries(TRICKS.map((trick) => [trick.id, trick]))
 const UP = new Vector3(0, 1, 0)
 
 const wrapAngle = (a) => Math.atan2(Math.sin(a), Math.cos(a))
+
+/** Where each pet trails the bike (rider space: x right, z forward). */
+const PET_SLOTS = [
+  [-2.6, -2.4],
+  [2.6, -2.4],
+  [0, -4.6],
+]
+const _petTarget = new Vector3()
+
+/**
+ * Pets follow their rider: each eases towards its slot behind the bike, faces
+ * where it's going, hops while the bike moves (flyers bob in the air instead)
+ * and snaps over after a teleport.
+ */
+function stepPets(pets, motion, dt, now) {
+  const cos = Math.cos(motion.yaw)
+  const sin = Math.sin(motion.yaw)
+  pets.forEach((pet, i) => {
+    const [sx, sz] = PET_SLOTS[i] ?? PET_SLOTS[0]
+    const flying = pet.flies
+    _petTarget.set(motion.position.x + sx * cos + sz * sin, motion.position.y + (flying ? 2.2 : 0), motion.position.z - sx * sin + sz * cos)
+    const g = pet.group
+    if (!pet.placed || g.position.distanceToSquared(_petTarget) > 900) {
+      g.position.copy(_petTarget)
+      pet.placed = true
+    }
+    const before = g.position.clone()
+    g.position.lerp(_petTarget, 1 - Math.exp(-dt * 7))
+    const moved = before.distanceTo(g.position) / Math.max(dt, 1e-4)
+    if (moved > 0.5) {
+      const heading = Math.atan2(g.position.x - before.x, g.position.z - before.z)
+      g.rotation.y += wrapAngle(heading - g.rotation.y) * (1 - Math.exp(-dt * 8))
+    } else {
+      g.rotation.y += wrapAngle(motion.yaw - g.rotation.y) * (1 - Math.exp(-dt * 3))
+    }
+    const phase = now * (flying ? 3 : 11) + i * 1.7
+    pet.body.position.y = flying ? Math.sin(phase) * 0.25 : Math.abs(Math.sin(phase)) * Math.min(moved / 12, 1) * 0.5
+    pet.body.rotation.z = flying ? Math.sin(phase * 0.7) * 0.12 : 0
+  })
+}
 
 /** Falls back to the blocky avatar if the Bloxity avatar can't load. */
 class AvatarBoundary extends Component {
@@ -85,7 +126,7 @@ function PoseDebug({ poseRef }) {
  * wheelie, landing squash, plus trail/aura updates.
  */
 function stepRider(ctx, camera, delta) {
-  const { motion, bike, trail, streak, aura, anchor, anim: a, pose, root, pivot, content } = ctx
+  const { motion, bike, trail, streak, aura, pets, anchor, anim: a, pose, root, pivot, content } = ctx
   if (!root || !pivot || !content) return
   const dt = Math.min(delta, 0.05)
   const now = performance.now() / 1000
@@ -192,6 +233,7 @@ function stepRider(ctx, camera, delta) {
   safely('trail', () => trail.update(anchor, camera, motion.speed > 2))
   anchor.copy(REAR_CONTACT).applyAxisAngle(UP, motion.yaw).add(motion.position)
   safely('streak', () => streak.update(anchor, motion.speed > 2, now))
+  if (pets.length) safely('pets', () => stepPets(pets, motion, dt, now))
 }
 
 const reportedEffects = new Set()
@@ -236,6 +278,28 @@ export function Rider({ motion, look, name, isLocal = false, bubble, onAvatarRea
 
   const bike = useMemo(() => createBike(look.bike), [look.bike])
   useEffect(() => () => bike.dispose(), [bike])
+
+  // Equipped pets ("puppy,fox"): rebuilt when the list changes.
+  const petList = look.pets || ''
+  const petsGroup = useMemo(() => new Group(), [])
+  const pets = useMemo(
+    () =>
+      petList
+        .split(',')
+        .filter(Boolean)
+        .slice(0, PET_SLOTS.length)
+        .map((id) => ({ ...createPet(id), flies: petFlies(id), placed: false })),
+    [petList],
+  )
+  useEffect(() => {
+    for (const pet of pets) petsGroup.add(pet.group)
+    return () => {
+      for (const pet of pets) {
+        petsGroup.remove(pet.group)
+        pet.dispose()
+      }
+    }
+  }, [pets, petsGroup])
 
   const trail = useMemo(() => new TrailRibbon('none'), [])
   const streak = useMemo(() => new TireStreak(), [])
@@ -293,7 +357,7 @@ export function Rider({ motion, look, name, isLocal = false, bubble, onAvatarRea
   const anchor = useMemo(() => new Vector3(), [])
 
   useFrame((state, delta) => {
-    stepRider({ motion, bike, trail, streak, aura, anchor, anim: anim.current, pose: poseRef.current, root: root.current, pivot: pivot.current, content: content.current }, state.camera, delta)
+    stepRider({ motion, bike, trail, streak, aura, pets, anchor, anim: anim.current, pose: poseRef.current, root: root.current, pivot: pivot.current, content: content.current }, state.camera, delta)
   })
 
   const seed = look.seed || name || 'rider'
@@ -331,6 +395,7 @@ export function Rider({ motion, look, name, isLocal = false, bubble, onAvatarRea
       </group>
       <primitive object={trail.mesh} />
       <primitive object={streak.mesh} />
+      <primitive object={petsGroup} />
     </>
   )
 }

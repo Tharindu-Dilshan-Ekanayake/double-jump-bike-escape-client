@@ -18,12 +18,39 @@ import {
   RARITY_COLORS,
   collectionCount,
   fasterLabel,
+  starsNeededFor,
 } from '../../shared/gameData.js'
 import { BikeIcon } from '../icons'
 import { Grid, Modal, OwnButton, Price, Tabs } from './Modal'
 import { action } from './actions'
 
 const owns = (me, cat, id) => parseList(me.owned).includes(`${cat}:${id}`)
+
+/** A greyed-out card button for things that can't be bought ("⭐ 15 STARS"). */
+function LockedButton({ children }) {
+  return (
+    <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
+      {children}
+    </button>
+  )
+}
+
+/** Star rewards and other exclusives aren't sold: say how to earn them instead. */
+function ItemButton({ me, cat, item, equipped }) {
+  const owned = owns(me, cat, item.id)
+  if (item.exclusive === 'stars' && !owned) return <LockedButton>⭐ {starsNeededFor(cat, item.id)} STARS</LockedButton>
+  return (
+    <OwnButton
+      me={me}
+      owned={owned}
+      equipped={equipped}
+      currency={item.currency ?? 'wins'}
+      price={item.price}
+      onBuy={action('buy', { cat, id: item.id })}
+      onEquip={action('equip', { cat, id: item.id })}
+    />
+  )
+}
 
 /* ---------------------------------------------------------------------------
  * Item shop: trails + auras
@@ -88,15 +115,7 @@ export function ItemsPanel({ me, props }) {
               {trail.id !== 'none' && <RarityChip rarity={trail.rarity} />}
               <div className="ink-text text-[22px] font-bold">{trail.name}</div>
               <div className="chip bg-[#e6ffe9] text-[#1d7a2f]">+{Math.round(trail.bonus * 100)}% Speed</div>
-              <OwnButton
-                me={me}
-                owned={owns(me, 'trail', trail.id)}
-                equipped={me.trail === trail.id}
-                currency="wins"
-                price={trail.price}
-                onBuy={action('buy', { cat: 'trail', id: trail.id })}
-                onEquip={action('equip', { cat: 'trail', id: trail.id })}
-              />
+              <ItemButton me={me} cat="trail" item={trail} equipped={me.trail === trail.id} />
             </div>
           ))}
         </Grid>
@@ -111,15 +130,7 @@ export function ItemsPanel({ me, props }) {
               {aura.id !== 'none' && <RarityChip rarity={aura.rarity} />}
               <div className="ink-text text-[22px] font-bold">{aura.name}</div>
               <div className="chip bg-[#fff6d6] text-[#9a6a00]">{aura.winsMult}x Wins</div>
-              <OwnButton
-                me={me}
-                owned={owns(me, 'aura', aura.id)}
-                equipped={me.aura === aura.id}
-                currency={aura.currency}
-                price={aura.price}
-                onBuy={action('buy', { cat: 'aura', id: aura.id })}
-                onEquip={action('equip', { cat: 'aura', id: aura.id })}
-              />
+              <ItemButton me={me} cat="aura" item={aura} equipped={me.aura === aura.id} />
             </div>
           ))}
         </Grid>
@@ -132,8 +143,15 @@ export function ItemsPanel({ me, props }) {
  * Bikes
  * ------------------------------------------------------------------------- */
 
+/** Why a bike can't be bought yet (exclusives are earned, World 2 bikes wait for World 2). */
+function bikeLockLabel(bike) {
+  if (bike.shop === 'stars') return `⭐ ${starsNeededFor('bike', bike.id)} STARS`
+  if (bike.shop === 'rebirth') return `🔒 REBIRTH ${bike.milestone}`
+  return '🔒 WORLD 2'
+}
+
 export function BikeCard({ me, bike, highlight }) {
-  const locked = !bikeAvailable(bike, me)
+  const locked = !owns(me, 'bike', bike.id) && !bikeAvailable(bike, me)
   const faster = fasterLabel(bike, me)
   return (
     <div className={`card ${me.bike === bike.id ? 'is-equipped' : ''} ${highlight ? 'is-highlight' : ''}`}>
@@ -143,9 +161,7 @@ export function BikeCard({ me, bike, highlight }) {
       <div className="chip bg-[#e6f3ff] text-[#1d5aa8]">{formatNumber(bike.mult)}x Speed</div>
       {faster && !owns(me, 'bike', bike.id) && <div className="ink-text text-[14px] font-bold text-[#2fbf4a]">{faster} than your best bike!</div>}
       {locked ? (
-        <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
-          🔒 WORLD 2
-        </button>
+        <LockedButton>{bikeLockLabel(bike)}</LockedButton>
       ) : (
       <OwnButton
         me={me}

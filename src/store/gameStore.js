@@ -49,6 +49,20 @@ export const useGameStore = create((set, get) => ({
   training: null,
   /** The full-screen rebirth celebration: { rebirths, bonusFrom, bonusTo, treadmills, bikes, at }. */
   rebirthCelebration: null,
+  /** Server clock minus ours (ms), for countdowns that the server checks. */
+  serverOffset: 0,
+  /** An egg hatching on screen: { egg, pet, isNew, at }. */
+  hatching: null,
+  /** The lucky spin: the last result, the wheel's angle, and when its result was shown. */
+  spinResult: null,
+  spinAngle: 0,
+  spinShown: 0,
+  /** After a fall on the course: { gid, islandName, fall, at } (see DeathPrompt). */
+  deathPrompt: null,
+  /** The island the server agreed to continue from (the controller moves you there). */
+  continueTo: 0,
+  /** Fell at a gate you're too slow for: { stage, need, have, missing, seconds, pad, padMult, at }. */
+  gateFail: null,
   toasts: [],
   levelUp: null,
   /** When the rider last landed on a new island this run (the "GAP CLEARED!" pop). */
