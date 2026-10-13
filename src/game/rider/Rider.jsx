@@ -2,7 +2,9 @@ import { useFrame } from '@react-three/fiber'
 import { Component, Suspense, useEffect, useMemo, useRef } from 'react'
 import { Mesh, MeshBasicMaterial, SphereGeometry, Vector3 } from 'three'
 
+import { burst } from '../burst'
 import PlayerAvatar from '../PlayerAvatar'
+import { ringBurst } from '../rings'
 import { textSprite } from '../world/signs'
 import { createBlockyAvatar } from './blockyAvatar'
 import { BIKE, createBike } from './bikeModel'
@@ -19,6 +21,8 @@ const POSE_DEBUG = Boolean(DEV_PARAMS?.has('posedebug'))
 const PIVOT_Y = 2.1
 const REAR_WHEEL = new Vector3(0, 0.55, -1.8)
 const REAR_CONTACT = new Vector3(0, 0, -1.55)
+/** Fastest the pedals turn (radians/sec), so legs don't blur at top speed. */
+const MAX_CADENCE = 26
 const TRICK_BY_ID = Object.fromEntries(TRICKS.map((trick) => [trick.id, trick]))
 
 const UP = new Vector3(0, 1, 0)
@@ -93,7 +97,9 @@ function stepRider(ctx, camera, delta) {
   a.wheel += (motion.speed * dt) / BIKE.wheelRadius
   bike.wheels[0].rotation.x = a.wheel
   bike.wheels[1].rotation.x = a.wheel
-  if (!motion.air) a.pedal += motion.speed * dt * 0.55
+  // Pedals turn with the rear wheel (about a 2:1 gear), capped so fast riding
+  // stays readable; they freewheel in the air.
+  if (!motion.air) a.pedal += Math.min(motion.speed * 0.55, MAX_CADENCE) * dt
   bike.crank.rotation.x = a.pedal
   for (const pedal of bike.pedals) pedal.rotation.x = -a.pedal
   for (const wing of bike.wings) {
@@ -105,6 +111,11 @@ function stepRider(ctx, camera, delta) {
   // counter); spamming chains them and speeds them up.
   const flipsDelta = (motion.flips - a.lastFlips) & 0xffff
   if (flipsDelta > 0 && flipsDelta < 64) {
+    // Double-jump ring burst, in the trick's colours.
+    const [c1, c2] = trickFor(motion.flips).colors ?? ['#ffffff', '#ffffff']
+    ringBurst(motion.position, { color: c1, from: 1.5, to: 9, life: 0.5, lift: 0.4 })
+    ringBurst(motion.position, { color: '#ffffff', from: 0.8, to: 5, life: 0.32, lift: 0.5, solid: true, opacity: 0.9 })
+    burst(motion.position, { color: c2, count: 10, speed: 9, up: 1, life: 0.45, gravity: 2 })
     for (let k = flipsDelta - 1; k >= 0; k -= 1) {
       if (a.queue.length < 2) a.queue.push(trickFor(motion.flips - k).id)
     }
@@ -146,13 +157,23 @@ function stepRider(ctx, camera, delta) {
   const jumpAge = now - motion.jumpAt
   const wheelie = jumpAge < 0.4 ? -Math.sin((jumpAge / 0.4) * Math.PI) * 0.32 : 0
   const landAge = now - motion.landAt
-  const squash = landAge < 0.25 ? Math.sin((landAge / 0.25) * Math.PI) * 0.12 : 0
+  const power = motion.landPower ?? 0.6
+  if (motion.landAt !== a.lastLandAt) {
+    a.lastLandAt = motion.landAt
+    if (landAge < 0.3) {
+      // Dust kicked up on touchdown, bigger for harder landings.
+      ringBurst(motion.position, { color: '#efe3c8', from: 1, to: 4 + 5 * power, life: 0.55, lift: 0.15, solid: true, opacity: 0.6 })
+      burst(motion.position, { color: '#eadfc8', count: Math.round(10 + 16 * power), speed: 6 + 6 * power, up: 1.5, life: 0.6, gravity: 5 })
+    }
+  }
+  const squash = landAge < 0.28 ? Math.sin((landAge / 0.28) * Math.PI) * (0.07 + 0.1 * power) : 0
 
   // Stopped on the ground: one foot down and the bike tips a little that way.
   const stopped = !motion.air && motion.speed < 0.6 ? 1 : 0
   a.idle += (stopped - a.idle) * (1 - Math.exp(-dt * 6))
 
-  pivot.rotation.set(spinX + wheelie, spinY, a.lean - a.idle * 0.12 + spinZ)
+  // Nose dips a touch as the landing squashes the forks.
+  pivot.rotation.set(spinX + wheelie + squash * 0.4, spinY, a.lean - a.idle * 0.12 + spinZ)
   bike.group.rotation.y = whip
   content.scale.set(1 + squash * 0.5, 1 - squash, 1 + squash * 0.5)
 
@@ -164,11 +185,24 @@ function stepRider(ctx, camera, delta) {
   pose.trickAmt = trickAmt
   pose.time = now
 
-  aura.update(now)
+  // Cosmetics: a failing effect must never stop the frame (and with it the
+  // rider's controls), so each one is isolated and reported once.
+  safely('aura', () => aura.update(now))
   anchor.copy(REAR_WHEEL).applyAxisAngle(UP, motion.yaw).add(motion.position)
-  trail.update(anchor, camera, motion.speed > 2)
+  safely('trail', () => trail.update(anchor, camera, motion.speed > 2))
   anchor.copy(REAR_CONTACT).applyAxisAngle(UP, motion.yaw).add(motion.position)
-  streak.update(anchor, motion.speed > 2, now)
+  safely('streak', () => streak.update(anchor, motion.speed > 2, now))
+}
+
+const reportedEffects = new Set()
+function safely(name, run) {
+  try {
+    run()
+  } catch (err) {
+    if (reportedEffects.has(name)) return
+    reportedEffects.add(name)
+    console.error(`[rider] ${name} effect failed; skipping it`, err)
+  }
 }
 
 /**
@@ -197,6 +231,7 @@ export function Rider({ motion, look, name, isLocal = false, bubble, onAvatarRea
     trickT: 0,
     queue: [],
     idle: 0,
+    lastLandAt: motion.landAt,
   })
 
   const bike = useMemo(() => createBike(look.bike), [look.bike])

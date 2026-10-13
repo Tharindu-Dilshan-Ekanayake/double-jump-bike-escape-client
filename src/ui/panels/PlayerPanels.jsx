@@ -12,14 +12,16 @@ import {
   formatNumber,
   itemBonus,
   parseList,
-  rebirthBonus,
-  rebirthGainFor,
-  rebirthLevelFor,
+  rebirthSpeedFor,
   worldUnlocked,
+  REBIRTH_MILESTONES,
+  rebirthPreview,
 } from '../../shared/gameData.js'
 import { gameState, useGameStore } from '../../store/gameStore'
 import { useNow } from '../useNow'
-import { BikeCard } from './ShopPanels'
+import { BikeIcon } from '../icons'
+import { DailyQuests } from './RetentionPanels'
+import { BikeCard, CollectionCounter } from './ShopPanels'
 import { Grid, Modal, Tabs } from './Modal'
 import { action } from './actions'
 import { questRows } from './questStatus'
@@ -85,12 +87,13 @@ export function InventoryPanel({ me, props }) {
         <ItemsGrid me={me} />
       ) : tab === 'bikes' ? (
         <>
+          <CollectionCounter me={me} />
           <Grid>
             {bikes.map((bike) => (
               <BikeCard key={bike.id} me={me} bike={bike} />
             ))}
           </Grid>
-          <p className="ink-text mt-4 text-center text-[17px]">Buy more bikes on the pads by the start or in the Wins Shop.</p>
+          <p className="ink-text mt-4 text-center text-[17px]">Ride onto a bike in the lobby's Bike Shop and press E to buy it.</p>
         </>
       ) : null}
     </Modal>
@@ -102,41 +105,78 @@ export function InventoryPanel({ me, props }) {
  * ------------------------------------------------------------------------- */
 
 export function RebirthPanel({ me }) {
-  const needed = rebirthLevelFor(me.rebirths)
-  const ready = me.level >= needed
-  const gain = rebirthGainFor(Math.max(me.level, needed))
+  const needed = rebirthSpeedFor(me.rebirths)
+  const ready = me.totalSpeed >= needed
+  const preview = rebirthPreview(me)
+  const owned = parseList(me.owned)
   return (
-    <Modal title="Rebirth" icon="🔄" color="#2f8cff" width="min(620px, 94vw)">
-      <div className="card gap-3 px-6">
-        <div className="game-text text-[30px]">Rebirths: {formatNumber(me.rebirths)}</div>
-        <div className="flex items-center gap-4">
-          <span className="game-text text-[44px] text-[#d27bff]">+{formatNumber(rebirthBonus(me.rebirths) * 100)}%</span>
-          <span className="game-text text-[44px]">→</span>
-          <span className="game-text text-[44px] text-[#7dff8a]">+{formatNumber(rebirthBonus(me.rebirths + gain) * 100)}%</span>
-        </div>
-        <div className="ink-text text-[19px]">Permanent Speed XP bonus</div>
+    <Modal title="Rebirth" icon="🔄" color="#2f8cff" width="min(680px, 94vw)">
+      <div className="card gap-2 px-6">
+        <div className="game-text text-[28px]">Rebirth {formatNumber(me.rebirths)} → {formatNumber(preview.to)}</div>
         {ready ? (
-          <div className="game-text mt-1 text-[28px] text-[#ffe27a]">Rebirth now for +{formatNumber(gain)} rebirths!</div>
+          <div className="game-text text-[26px] text-[#ffe27a]">Ready to rebirth!</div>
         ) : (
           <>
-            <div className="ink-text mt-2 text-[20px] font-bold">
-              Reach Level {needed} ({Math.min(me.level, needed)}/{needed})
+            <div className="ink-text text-[19px] font-bold">
+              Reach ⚡{formatNumber(needed)} Speed ({formatNumber(Math.min(me.totalSpeed, needed))}/{formatNumber(needed)})
             </div>
             <div className="progress-mini">
-              <div style={{ width: `${Math.min(1, me.level / needed) * 100}%` }} />
+              <div style={{ width: `${Math.min(1, me.totalSpeed / needed) * 100}%` }} />
             </div>
           </>
         )}
-        <div className="ink-text text-[16px]">The higher your level, the more rebirths you get: Lvl 20 → {rebirthGainFor(20)}, Lvl 40 → {rebirthGainFor(40)}.</div>
+
+        <div className="rebirth-preview">
+          <div className="preview-col is-gain">
+            <div className="game-text text-[20px]">You get</div>
+            <div className="ink-text text-[17px] font-bold">
+              ⚡ Speed bonus +{formatNumber(preview.bonusFrom * 100)}% → <span className="text-[#2fbf4a]">+{formatNumber(preview.bonusTo * 100)}%</span>
+            </div>
+            {preview.treadmills.map((pad) => (
+              <div key={pad.id} className="ink-text text-[17px] font-bold">
+                🏋️ {pad.label} treadmill ({formatNumber(pad.mult)}x)
+              </div>
+            ))}
+            {preview.milestone && (
+              <div className="ink-text text-[17px] font-bold text-[#b45cff]">
+                🚲 {preview.milestone.bike.name} (exclusive, {formatNumber(preview.milestone.bike.mult)}x)
+              </div>
+            )}
+          </div>
+          <div className="preview-col is-lose">
+            <div className="game-text text-[20px]">You reset</div>
+            <div className="ink-text text-[17px] font-bold">⚡ Speed and level to 0</div>
+            <div className="ink-text text-[15px] opacity-80">Keep: Wins, bikes, trails, auras, items, tune-ups, records</div>
+          </div>
+        </div>
+
+        <div className="game-text mt-1 text-[20px]">Rebirth milestones</div>
+        <div className="milestone-row">
+          {REBIRTH_MILESTONES.map(({ at, bike }) => {
+            const have = owned.includes(`bike:${bike.id}`)
+            return (
+              <div key={at} className={`milestone ${have ? 'is-owned' : ''}`} style={{ '--rarity': RARITY_COLORS[bike.rarity] }}>
+                <BikeIcon frame={bike.frame} rim={bike.rim} accent={bike.accent} size={84} />
+                <div className="ink-text text-[15px] font-bold">{bike.name}</div>
+                <div className="chip text-white" style={{ background: RARITY_COLORS[bike.rarity] }}>
+                  {have ? '✓ OWNED' : `REBIRTH ${at}`}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
         <button
           type="button"
-          className={`btn-chunky ${ready ? 'btn-green press' : 'btn-gray'} game-text mt-2 px-10 py-2 text-[34px]`}
+          className={`btn-chunky ${ready ? 'btn-green press btn-shine' : 'btn-gray'} game-text mt-2 px-10 py-2 text-[34px]`}
           disabled={!ready}
           onClick={action('rebirth')}
         >
           REBIRTH
         </button>
-        <div className="ink-text text-[15px] opacity-70">Resets your level (and jumps) to 1. Wins and items stay. World 2 needs 10 rebirths.</div>
+        <div className="ink-text text-[14px] opacity-70">
+          The next one needs ⚡{formatNumber(rebirthSpeedFor(preview.to))}. World 2 needs {WORLDS[1].unlock.rebirths} rebirths.
+        </div>
       </div>
     </Modal>
   )
@@ -150,6 +190,8 @@ export function QuestsPanel({ me }) {
   const rows = questRows(me)
   return (
     <Modal title="Quests" icon="📜" color="#32c94a" width="min(720px, 94vw)">
+      <DailyQuests me={me} />
+      <h3 className="game-text mb-2 text-[26px]">📜 Quest Lines</h3>
       <div className="flex flex-col gap-3">
         {rows.map(({ quest, target, progress, ready, done, reward }) => (
           <div key={quest.id} className="card flex-row gap-4 px-4 text-left">
@@ -343,12 +385,12 @@ export function WelcomePanel() {
     <Modal title="Welcome!" icon="🚲" color="#ff9a1f" width="min(680px, 94vw)">
       <div className="flex flex-col gap-2 text-left">
         {[
-          ['⚡', 'Gain +1 Speed every time you move. Speed fills your level bar.'],
-          ['⏫', 'Every level = +1 jump and faster bike. Tap SPACE in the air to double jump, or hold it to climb.'],
-          ['🌉', 'Stages are separated by gaps — the further you go, the bigger the gap. More jumps and a faster bike = longer jumps.'],
+          ['⚡', 'Gain Speed every time you move. More Speed = a faster bike, and every level is +1 jump.'],
+          ['⏫', 'Tap SPACE in the air to double jump, or hold it to keep jumping.'],
+          ['🌉', "Each stage's gate shows the Speed you need to jump the gap. Not enough Speed? Train on a treadmill or replay a stage."],
           ['🏆', 'Step on a yellow Return pad to bank Wins and ride home.'],
           ['🔴', 'Fall into a gap or touch a laser and you are back in the lobby!'],
-          ['🔄', 'Rebirth for a permanent +50% Speed XP. Buy bikes, items, trails and auras to go faster.'],
+          ['🔄', 'Rebirth for a permanent Speed bonus and faster treadmills. Buy bikes, tune-ups, trails and auras with Wins.'],
         ].map(([icon, text]) => (
           <div key={text} className="card flex-row gap-3 px-4 text-left">
             <span className="text-[34px]">{icon}</span>

@@ -7,6 +7,7 @@ import { ROOM_NAME, describeReward } from '../shared/gameData.js'
 import { courseProgress, getLayout, worldIdAt } from '../shared/layout.js'
 import { gameState, useGameStore } from '../store/gameStore'
 import { spawnGainPopup, spawnRewardPopup } from '../ui/fx'
+import { confetti } from '../ui/confetti'
 import { rainWins } from '../ui/winsRain'
 
 /**
@@ -60,10 +61,13 @@ const ME_FIELDS = [
   'pass2xSpeed',
   'pass2xWins',
   'dailyAt',
+  'dailyStreak',
+  'daily',
   'chestAt',
   'bestStage',
   'quests',
   'counters',
+  'records',
 ]
 
 let client = null
@@ -157,10 +161,12 @@ function wireRoom(r) {
     const sdk = getSDK()
     safeCall(sdk?.game?.updateRoom?.bind(sdk.game), m.roomId, '')
     for (const name of m.roster || []) safeCall(sdk?.game?.playerInRoom?.bind(sdk.game), name)
-    if (m.isNew) gameState().openPanel('welcome')
-    // The daily reward has no button: it's collected on the first join each day.
+    // On arrival, one window after another: how to play (first time), what your
+    // bike earned while you were away, then today's login reward.
+    if (m.isNew) gameState().queuePanel('welcome')
+    if (m.offline) gameState().queuePanel('offline', m.offline)
     const me = gameState().me
-    if (me && me.dailyAt <= Date.now()) r.send('claim', { what: 'daily' })
+    if (me && me.dailyAt <= Date.now()) gameState().queuePanel('dailyReward')
   })
 
   r.onMessage('leaderboards', (boards) => store.setState({ leaderboards: boards }))
@@ -168,6 +174,9 @@ function wireRoom(r) {
   r.onMessage('gain', ({ n, pad }) => {
     spawnGainPopup(n, pad > 1)
     sound.gain()
+    // The treadmill counter adds up what this session on the belt has earned.
+    const training = gameState().training
+    if (training) useGameStore.setState({ training: { ...training, gained: training.gained + n } })
   })
 
   r.onMessage('levelup', (m) => {
@@ -176,10 +185,11 @@ function wireRoom(r) {
   })
 
   r.onMessage('reward', ({ wins }) => {
+    // Wins pad: fanfare and confetti, then trophies rain once you're home.
     spawnRewardPopup(`+${wins}`, 'wins')
-    // Pads send you home right away: let the trophies rain once you're back in the lobby.
+    confetti(Math.min(2, 0.8 + Math.log10(Math.max(1, wins)) * 0.3))
+    sound.fanfare()
     setTimeout(() => rainWins(wins), 900)
-    sound.win()
   })
 
   r.onMessage('result', (m) => {
@@ -191,8 +201,17 @@ function wireRoom(r) {
     if (m.reward) spawnRewardPopup(describeReward(m.reward), 'reward')
     if (m.reward?.wins) setTimeout(() => rainWins(m.reward.wins), 300)
     if (m.toast) gameState().toast(m.toast, 'success')
-    if (m.rebirth) sound.levelUp()
+    if (m.celebrate) {
+      // Rebirth: the full-screen celebration (see Hud), confetti and a fanfare.
+      gameState().closePanel()
+      useGameStore.setState({ rebirthCelebration: { ...m.celebrate, at: Date.now() } })
+      confetti(2)
+      sound.fanfare()
+      setTimeout(() => sound.levelUp(), 450)
+    } else if (m.rebirth) sound.levelUp()
     else sound.buy()
+    // The daily reward window closes itself once claimed.
+    if (m.streakDay) gameState().closePanel('dailyReward')
   })
 
   r.onMessage('needPass', ({ product }) => gameState().openPanel('shop', { highlight: product }))

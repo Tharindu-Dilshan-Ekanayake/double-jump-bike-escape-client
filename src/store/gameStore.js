@@ -43,8 +43,16 @@ export const useGameStore = create((set, get) => ({
 
   /** Open modal: { id, props } or null. */
   panel: null,
+  /** Windows waiting to open after the current one closes (welcome back, daily reward…). */
+  panelQueue: [],
+  /** Standing on a treadmill: { label, mult, color, gained, since } (the AFK counter). */
+  training: null,
+  /** The full-screen rebirth celebration: { rebirths, bonusFrom, bonusTo, treadmills, bikes, at }. */
+  rebirthCelebration: null,
   toasts: [],
   levelUp: null,
+  /** When the rider last landed on a new island this run (the "GAP CLEARED!" pop). */
+  cleared: null,
   /** Mid-air jump counter: { left, max } while airborne, else null. */
   jump: null,
   /** True once the player is past the lobby (shows the progress bar). */
@@ -61,9 +69,17 @@ export const useGameStore = create((set, get) => ({
 
   openPanel: (id, props = {}) => set({ panel: { id, props } }),
   closePanel: (id) => {
-    const { panel } = get()
+    const { panel, panelQueue } = get()
     if (!panel || (id && panel.id !== id)) return
-    set({ panel: null })
+    const [next, ...rest] = panelQueue
+    set({ panel: next ?? null, panelQueue: rest })
+  },
+
+  /** Opens a window now, or after the ones already open or waiting. */
+  queuePanel: (id, props = {}) => {
+    const { panel, panelQueue } = get()
+    if (!panel) set({ panel: { id, props } })
+    else set({ panelQueue: [...panelQueue, { id, props }] })
   },
 
   toast: (text, kind = 'info', ms = 2600) => {

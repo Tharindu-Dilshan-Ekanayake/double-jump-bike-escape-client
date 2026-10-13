@@ -166,7 +166,11 @@ function drawChevron(g, cx, cy, s) {
 }
 
 /** "SPAM JUMP TO DOUBLE JUMP!" panel for a wall face. */
-export function jumpWallSign(jumps, width = 30, starter = false, gap = false) {
+/**
+ * The gate on an island's front face: how to cross, and the Total Speed needed
+ * (the gap is built so less Speed falls short).
+ */
+export function jumpWallSign(speed, width = 30, starter = false) {
   const canvas = document.createElement('canvas')
   canvas.width = 1400
   canvas.height = 420
@@ -177,7 +181,7 @@ export function jumpWallSign(jumps, width = 30, starter = false, gap = false) {
   }
   drawOutlined(g, 'SPAM JUMP', 700, 95, { size: 120, font: FONT_TITLE, weight: 400, fill: ['#ffffff', '#dfe9ff'], strokeWidth: 14 })
   drawOutlined(g, 'TO DOUBLE JUMP!', 700, 225, { size: 100, font: FONT_TITLE, weight: 400, fill: ['#ffffff', '#dfe9ff'], strokeWidth: 13 })
-  const label = starter ? `Level ${jumps}+ to jump across — ride around to level up!` : gap ? `Level ${jumps}+ to jump across!` : `Needs ${jumps} jumps  •  Level ${jumps}+`
+  const label = starter ? `Need ⚡${formatNumber(speed)} Speed — ride around to get it!` : `Need ⚡${formatNumber(speed)} Speed to jump across!`
   drawOutlined(g, label, 700, 345, { size: 64, fill: ['#fff47a', '#ffb81f'], strokeWidth: 10 })
   return canvasPlane(canvas, (width * canvas.height) / canvas.width)
 }

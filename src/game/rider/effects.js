@@ -76,8 +76,9 @@ export class TrailRibbon {
     for (let i = 0; i < TRAIL_POINTS; i += 1) {
       const p = pts[Math.min(i, n - 1)]
       if (!p) break
+      // Past the last real point the ribbon just repeats it (with zero alpha).
       const next = pts[Math.min(i + 1, n - 1)]
-      const prev = pts[Math.max(i - 1, 0)]
+      const prev = pts[Math.min(Math.max(i - 1, 0), n - 1)]
       _tangent.subVectors(prev, next)
       if (_tangent.lengthSq() < 1e-6) _tangent.set(0, 0, 1)
       _view.subVectors(camera.position, p)

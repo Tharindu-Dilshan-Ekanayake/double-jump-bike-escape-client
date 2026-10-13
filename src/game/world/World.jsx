@@ -10,6 +10,7 @@ import { worldRef } from './worldRef'
 export function World() {
   const world = useMemo(() => buildWorld(), [])
   const leaderboards = useGameStore((s) => s.leaderboards)
+  const me = useGameStore((s) => s.me)
 
   useEffect(() => {
     worldRef.current = world
@@ -19,6 +20,8 @@ export function World() {
   }, [world])
 
   useEffect(() => world.updateLeaderboards(leaderboards), [world, leaderboards])
+  // Stand labels follow what you own ("OWNED", "+40% faster than your best bike!").
+  useEffect(() => world.updateStands(me), [world, me])
 
   useFrame((state, delta) => world.update(hazardTime(), Math.min(delta, 0.1), state.camera))
 

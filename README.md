@@ -71,23 +71,72 @@ and chat; the top right shows who you're playing as.
 - Stage 1 is level with the lobby; each later island sits 3 studs higher than
   the one before. Every island has a yellow Return pad and a purple 2x Wins
   pad, and a deadly river runs round it (water, lava, chocolate, slime… to suit
-  the stage). The gap in front of each stage is
-  longer than the last; a stage marked "Level N" needs level N to jump across
-  (stage 10 needs level 40, the World 1 escape 46, World 2 runs from 42 to 75).
-  The gaps to stages 1–3 are clear; from the gap to stage 4 on, lasers bob up
-  and down in them. Falling into the river or touching a laser sends you to the
-  lobby.
+  the stage). Each stage's gate shows a Total Speed (⚡10 for stage 1 up to
+  ⚡650K for stage 10 and ⚡1.4M to escape World 1). Speed sets the bike's top
+  speed and your level, and every level is one more jump, so the gap is built
+  from that number: with the gate's Speed you clear it, with clearly less (88%)
+  you physically fall short. The gaps to stages 1–3 are clear; from the gap to
+  stage 4 on, lasers bob up and down in them. Falling into the river or
+  touching a laser sends you to the lobby.
 - **Wins** are the only currency (stage pads, quests, daily reward, chest,
   codes). There is no premium currency.
-- **Rebirth** (from level 10) resets your level to 1 for a permanent +50%
-  Speed XP per rebirth. The higher your level, the more rebirths you get at
-  once: level 10 gives 1, level 20 gives 46, level 40 gives 243.
+- **Rebirth** needs a Speed target (⚡160K for the first, then 1.9x more each
+  time). It resets Speed (so the gates close again) for one rebirth: a
+  permanent +50% Speed and faster treadmills (Rebirth 1+, 5+, 10+…). The
+  Rebirth window previews exactly what you get and what resets; rebirthing
+  plays a full-screen celebration. Rebirths 5, 10 and 25 give exclusive bikes
+  (Reborn, Eclipse, Ascended) that can't be bought.
+- **Coming back**: a 7-day login streak (Day 7 is the big one; miss a day and
+  it starts over) opens on your first join each day. Three daily quests per
+  player, sized to their progress (e.g. "Clear 30 jumps", "Finish the Cloud
+  Stage", "Earn 50 Wins"), refresh at midnight UTC in the Quests window. While
+  you're away your best treadmill keeps training at 10% (up to 4 hours, at most
+  half your next rebirth); a "Welcome back!" window shows what it earned.
+- **Treadmills** pay while you stand still (AFK is fine); a counter shows what
+  the current session on the belt has earned. A live countdown above the Item
+  Shop shows the next restock.
+- **Collecting**: bikes, trails and auras have rarities (Common to Mythic).
+  The Bike Shop shows every bike spinning on a pedestal in its rarity colour,
+  labelled with how much faster it is than your best bike. There are 15 trails
+  and 15 auras to collect ("Collection X/30" in the Trails & Auras and
+  Inventory windows). A bar under your Wins always shows progress to the next
+  bike ("Dragon Bike 20/35 🏆").
+- **Stage records**: the timer starts when you ride out of the lobby. Landing
+  on a stage shows your split, 1–3 stars against its par (riding flat out at
+  the gate's top speed) and "NEW RECORD!" when you beat your best. Best stars
+  sit under each stage on the progress bar; records are saved with your profile.
+- **Bike Speed** button: tune-ups, each a permanent +10% Speed gain (up to 25).
+  Top speed itself always comes from your Speed.
+
+### Balance
+
+Every progression number (gates, Wins per stage, bike and treadmill tiers,
+prices, rebirth targets, rewards, quests) is in `config/balance.ts`. After a
+change:
+
+```bash
+npm run balance        # replays a new player's first hours: stages, purchases, rebirths
+npm run check:climb    # proves every gate: its Speed clears the gap, 88% falls short
+# then in the server repo: npm run sync-shared
+```
+
+With the current numbers a solo player reaches stages 1–2 in under a minute,
+stage 7 at about 33 minutes and rebirths for the first time at about 48;
+later lives take 12–35 minutes, World 1 is escaped at about 1:50 and World 2
+opens at about 3:50. One run of the newest stage pays 20–40% of the next bike,
+so players replay stages or train. The simulator's rider is tidy and solo, so
+real players land a little either side of these.
 - **Riding feel**: speed lines pour out to both sides and the screen edges
   zoom-blur from where you're heading (WebGL, see `src/game/SpeedBlur.jsx`),
-  with a burst on every jump; the camera widens with speed. Every mid-air jump
-  shows a stunt label (with a combo count when chained). A white line follows
-  the rear wheel, on the ground and in the air. Banking Wins rains trophies
-  into the Wins counter.
+  with a burst on every jump; the camera widens with speed. Pedals turn with
+  the wheel, the bike leans into turns and lifts its front wheel on take-off.
+  Every double jump fires a ring burst (in the trick's colours, for every rider)
+  and a stunt label (with a combo count when chained); landings squash the bike,
+  kick up a dust ring and shake the camera a little, harder for bigger drops.
+  The big "Jump: 7/11" counter pulses on every jump, turns orange then red as
+  jumps run out, and shows "GAP CLEARED!" on a new island. A white line follows
+  the rear wheel, on the ground and in the air. A Wins pad plays a fanfare with
+  confetti, then trophies rain into the Wins counter.
 - **Lobby**: a brick road with arrows to the course, leaderboards, the
   training zone (24 treadmills; standing on one pays out), the Bike Shop with
   every World 1 bike (ride onto one and press E), the Item Shop (restocks
@@ -126,7 +175,8 @@ rejoined the same way. The dev site reaches the dev game server automatically.
 ```bash
 npm run lint
 npm run build
-npm run check:climb   # simulates every stage: the listed level makes it, one level less falls
+npm run check:climb   # simulates every stage: its gate's Speed makes it, 88% of it falls
+npm run balance       # progression timeline for the numbers in config/balance.ts
 ```
 
 Dev-only URL switches (ignored in production builds):
