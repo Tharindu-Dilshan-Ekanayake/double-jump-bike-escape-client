@@ -1,4 +1,4 @@
-import { QUESTS } from '../../shared/gameData.js'
+import { QUESTS, dailyQuestProgress, parseDaily } from '../../shared/gameData.js'
 
 function parse(text) {
   try {
@@ -30,4 +30,22 @@ export function questRows(me) {
   })
 }
 
+/** Quest lines ready to claim (daily quests: see claimableDailyQuests). */
 export const claimableQuests = (me) => questRows(me).filter((row) => row.ready).length
+
+/** Today's daily quests with their progress (mirrors the server rules). */
+export function dailyQuestRows(me) {
+  const daily = parseDaily(me.daily)
+  let counters = {}
+  try {
+    counters = JSON.parse(me.counters || '{}') || {}
+  } catch {
+    counters = {}
+  }
+  return daily.quests.map((quest, index) => {
+    const progress = dailyQuestProgress(quest, counters)
+    return { quest, index, progress, ready: !quest.claimed && progress >= quest.target }
+  })
+}
+
+export const claimableDailyQuests = (me) => dailyQuestRows(me).filter((row) => row.ready).length

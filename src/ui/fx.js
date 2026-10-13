@@ -1,4 +1,4 @@
-import { formatNumber } from '../shared/gameData.js'
+import { formatNumber, formatRaceTime } from '../shared/gameData.js'
 
 /**
  * Fire-and-forget DOM effects: the "+1" speed popups, reward pops and screen
@@ -96,6 +96,29 @@ export function spawnTrickPopup(trick) {
     if (lastTrickPop === el) lastTrickPop = null
   })
 }
+
+/**
+ * Stage reached: its split time and 1-3 stars, with "NEW RECORD!" when it beats
+ * the rider's best (and the old best underneath).
+ */
+export function spawnStagePopup({ name, index, ms, stars, record, previous }) {
+  const el = document.createElement('div')
+  el.className = `stage-pop ${record ? 'is-record' : ''}`
+  const starRow = [1, 2, 3].map((n) => `<span class="star ${n <= stars ? 'on' : ''}" style="animation-delay:${0.15 + n * 0.12}s">★</span>`).join('')
+  el.innerHTML = `
+    ${record ? '<div class="stage-pop-record title-text">NEW RECORD!</div>' : ''}
+    <div class="stage-pop-name game-text">Stage ${index} · ${escapeHtml(name)}</div>
+    <div class="stage-pop-time title-text">${formatRaceTime(ms)}</div>
+    <div class="stage-pop-stars">${starRow}</div>
+    ${record && previous ? `<div class="stage-pop-prev game-text">was ${formatRaceTime(previous)}</div>` : ''}
+    ${!record && previous ? `<div class="stage-pop-prev game-text">best ${formatRaceTime(previous)}</div>` : ''}`
+  getLayer().appendChild(el)
+  el.addEventListener('animationend', (e) => {
+    if (e.target === el) el.remove()
+  })
+}
+
+const escapeHtml = (text) => String(text).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 export function flashScreen(kind = 'death') {
   const el = document.createElement('div')

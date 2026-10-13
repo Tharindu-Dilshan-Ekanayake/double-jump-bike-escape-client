@@ -184,6 +184,14 @@ export const sound = {
     arpeggio([523.25, 659.25, 783.99, 1046.5], 0.08, { type: 'triangle', dur: 0.25, vol: 0.12 })
     tone({ freq: 1567.98, type: 'sine', dur: 0.6, vol: 0.08, delay: 0.32 })
   },
+  /** Wins pad: a quick rising brass call, then a held chord over a drum roll and cymbal. */
+  fanfare() {
+    arpeggio([523.25, 659.25, 783.99], 0.09, { type: 'square', dur: 0.12, vol: 0.05 })
+    for (const freq of [523.25, 659.25, 783.99, 1046.5]) tone({ freq, type: 'square', dur: 0.95, vol: 0.03, delay: 0.3, attack: 0.02 })
+    tone({ freq: 2093, type: 'triangle', dur: 0.9, vol: 0.03, delay: 0.3 })
+    for (let i = 0; i < 6; i += 1) noise({ dur: 0.05, vol: 0.07, freq: 220, type: 'lowpass', delay: i * 0.045 })
+    noise({ dur: 0.6, vol: 0.05, freq: 6000, type: 'highpass', delay: 0.3 })
+  },
   win() {
     arpeggio([659.25, 783.99, 987.77, 1318.5], 0.07, { type: 'square', dur: 0.18, vol: 0.06 })
     arpeggio([1046.5, 1318.5, 1567.98], 0, { type: 'triangle', dur: 0.7, vol: 0.06, delay: 0.3 })

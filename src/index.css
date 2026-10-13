@@ -491,10 +491,449 @@ button {
   -webkit-text-stroke: 0;
 }
 
+/* "Jump: 7/11": pulses on every jump, warns when jumps run low. */
 .jump-counter {
-  font-size: 72px;
+  display: inline-block;
+  font-size: 84px;
   line-height: 1;
-  animation: pop-in 0.18s ease-out;
+  animation: jump-pulse 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.3);
+}
+.jump-counter.is-low {
+  color: #ffb21f;
+}
+.jump-counter.is-empty {
+  color: #ff5a4f;
+  animation:
+    jump-pulse 0.34s cubic-bezier(0.2, 0.9, 0.3, 1.3),
+    jump-shake 0.36s linear 0.1s;
+}
+.jump-counter.is-cleared {
+  color: #7dff8a;
+}
+@keyframes jump-pulse {
+  0% {
+    transform: scale(1.5);
+    color: #fff47a;
+  }
+  55% {
+    transform: scale(0.94);
+  }
+}
+@keyframes jump-shake {
+  25% {
+    translate: -6px 0;
+  }
+  75% {
+    translate: 6px 0;
+  }
+}
+/* "GAP CLEARED!" over the counter when you land on a new island. */
+.jump-cleared {
+  font-size: 46px;
+  color: #ffe23a;
+  animation: cleared-pop 1.6s ease-out forwards;
+}
+@keyframes cleared-pop {
+  0% {
+    transform: scale(0.3) rotate(-8deg);
+    opacity: 0;
+  }
+  15% {
+    transform: scale(1.25) rotate(3deg);
+    opacity: 1;
+  }
+  28% {
+    transform: scale(1) rotate(0deg);
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-30px) scale(0.95);
+    opacity: 0;
+  }
+}
+
+/* Next bike: always-on progress under the Wins pill. */
+.next-bike {
+  display: block;
+  width: 250px;
+  padding: 6px 10px 8px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: linear-gradient(rgba(36, 44, 66, 0.92), rgba(18, 22, 36, 0.92));
+  box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+  text-align: left;
+}
+.next-bike-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font: 700 15px 'Fredoka', system-ui, sans-serif;
+  color: #fff;
+  white-space: nowrap;
+}
+.next-bike-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.next-bike-bar {
+  height: 12px;
+  margin-top: 5px;
+  overflow: hidden;
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  background: #3a4258;
+}
+.next-bike-bar > div {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(#ffe27a, #ffb21f);
+  transition: width 0.4s ease;
+}
+.next-bike.is-ready .next-bike-bar > div {
+  background: linear-gradient(#b6ff7a, #2fbf4a);
+}
+.next-bike-ready {
+  margin-top: 4px;
+  font: 700 13px 'Fredoka', system-ui, sans-serif;
+  color: #7dff8a;
+  animation: key-bob 0.9s ease-in-out infinite;
+}
+
+/* Rarity tags and the trails/auras collection. */
+.rarity-chip {
+  font-size: 12px;
+  letter-spacing: 0.06em;
+}
+.collection-counter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 auto 14px;
+  max-width: 460px;
+  font-size: 22px;
+}
+.collection-bar {
+  flex: 1;
+  height: 14px;
+  overflow: hidden;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: #d8deea;
+}
+.collection-bar > div {
+  height: 100%;
+  background: linear-gradient(90deg, #ff6ec4, #b45cff, #3ba8ff);
+}
+
+/* Best stars under each stage node on the progress bar. */
+.progress-stars {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  translate: -50% 1px;
+  font-size: 14px;
+  letter-spacing: -1px;
+  color: #4a5068;
+  -webkit-text-stroke: 0;
+  white-space: nowrap;
+}
+.progress-stars .on {
+  color: #ffd23a;
+  text-shadow: 0 1px 0 #15151d;
+}
+
+/* Stage reached: split time, stars, NEW RECORD! */
+.stage-pop {
+  position: absolute;
+  left: 50%;
+  top: 15%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 10px 34px 14px;
+  border: 4px solid var(--ink);
+  border-radius: 22px;
+  background: linear-gradient(rgba(36, 44, 66, 0.94), rgba(18, 22, 36, 0.94));
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35);
+  translate: -50% 0;
+  zoom: var(--hud-scale);
+  animation: stage-pop 2.6s ease-out forwards;
+}
+.stage-pop.is-record {
+  border-color: #ffd23a;
+  box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 0 30px rgba(255, 210, 58, 0.6);
+}
+.stage-pop-record {
+  margin-top: -34px;
+  padding: 2px 18px 4px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: linear-gradient(#ff6a80, #d8203f);
+  color: #fff;
+  font-size: 30px;
+  animation: record-wobble 0.6s ease-in-out 0.2s 2;
+}
+.stage-pop-name {
+  font-size: 22px;
+}
+.stage-pop-time {
+  font-size: 58px;
+  line-height: 1;
+  color: #fff47a;
+}
+.stage-pop-stars {
+  display: flex;
+  gap: 6px;
+  font-size: 44px;
+  line-height: 1;
+}
+.stage-pop-stars .star {
+  color: #66708c;
+  -webkit-text-stroke: 3px var(--ink);
+  paint-order: stroke fill;
+  animation: star-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1) both;
+}
+.stage-pop-stars .star.on {
+  color: #ffd23a;
+}
+.stage-pop-prev {
+  margin-top: 2px;
+  font-size: 16px;
+  opacity: 0.85;
+}
+@keyframes stage-pop {
+  0% {
+    transform: translateY(-20px) scale(0.6);
+    opacity: 0;
+  }
+  10% {
+    transform: translateY(0) scale(1.06);
+    opacity: 1;
+  }
+  16% {
+    transform: scale(1);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+}
+@keyframes star-pop {
+  from {
+    transform: scale(0) rotate(-40deg);
+  }
+}
+@keyframes record-wobble {
+  25% {
+    transform: rotate(-6deg) scale(1.08);
+  }
+  75% {
+    transform: rotate(6deg) scale(1.08);
+  }
+}
+
+/* Daily login streak calendar. */
+.streak-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 8px;
+}
+.streak-day {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  border: 4px solid var(--ink);
+  border-radius: 16px;
+  background: linear-gradient(#5d6a85, #3c465c);
+}
+.streak-day.is-big {
+  background: linear-gradient(#b45cff, #6a22d0);
+}
+.streak-day.is-claimed {
+  background: linear-gradient(#5cf06a, #22b544);
+}
+.streak-day.is-today {
+  background: linear-gradient(#ffd23a, #ff9a1f);
+  box-shadow: 0 0 0 4px #fff, 0 0 26px #ffd23a;
+  animation: key-bob 1s ease-in-out infinite;
+}
+.streak-tick {
+  position: absolute;
+  top: -12px;
+  right: -10px;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--ink);
+  border-radius: 50%;
+  background: #fff;
+  color: #22b544;
+  font: 800 18px 'Fredoka', system-ui, sans-serif;
+}
+
+/* Welcome back: offline earnings. */
+.offline-amount {
+  margin: 4px 0;
+  font-size: 64px;
+  color: #ffd23a;
+  -webkit-text-stroke: 0.1em var(--ink);
+  paint-order: stroke fill;
+  animation: pop-in 0.4s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+
+/* Treadmill counter. */
+.training-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 18px 8px 8px;
+  translate: -50% 0;
+  border: 4px solid var(--ink);
+  border-radius: 999px;
+  background: linear-gradient(rgba(36, 44, 66, 0.92), rgba(18, 22, 36, 0.92));
+  box-shadow: 0 5px 0 rgba(0, 0, 0, 0.3), 0 0 0 3px var(--pad, #b8c0ca) inset;
+}
+.training-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--pad, #b8c0ca);
+  font-size: 26px;
+  animation: key-bob 0.7s ease-in-out infinite;
+}
+
+/* Rebirth window: preview and milestones. */
+.rebirth-preview {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 10px;
+  width: 100%;
+  margin-top: 6px;
+  text-align: left;
+}
+.preview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 10px 14px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+}
+.preview-col.is-gain {
+  background: #e7ffe9;
+}
+.preview-col.is-lose {
+  background: #ffecec;
+}
+.milestone-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+.milestone {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: #eef2f8;
+  filter: grayscale(0.7);
+  opacity: 0.85;
+}
+.milestone.is-owned {
+  background: #fff;
+  box-shadow: 0 0 16px var(--rarity);
+  filter: none;
+  opacity: 1;
+}
+
+/* The full-screen rebirth celebration. */
+.rebirth-party {
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 45%, rgba(130, 70, 255, 0.85), rgba(20, 10, 60, 0.92));
+  animation: party-in 0.4s ease-out;
+}
+.rebirth-rays {
+  position: absolute;
+  left: 50%;
+  top: 45%;
+  width: 260vmax;
+  height: 260vmax;
+  translate: -50% -50%;
+  background: repeating-conic-gradient(rgba(255, 230, 120, 0.16) 0deg 8deg, transparent 8deg 18deg);
+  animation: loading-spin 30s linear infinite;
+}
+.rebirth-title {
+  font-size: 120px;
+  line-height: 1;
+  background: linear-gradient(#ffffff, #ffe27a 45%, #ff8a1f);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 0;
+  filter: drop-shadow(0 6px 0 #15151d) drop-shadow(0 0 24px rgba(255, 210, 58, 0.7));
+  animation: party-title 0.9s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.party-unlock {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 190px;
+  padding: 10px 16px;
+  border: 4px solid var(--ink);
+  border-radius: 18px;
+  background: linear-gradient(rgba(36, 44, 66, 0.92), rgba(18, 22, 36, 0.92));
+  box-shadow: 0 0 0 3px var(--pad, #ffd23a) inset, 0 0 24px var(--pad, #ffd23a);
+  animation: party-card 0.6s cubic-bezier(0.2, 1.4, 0.4, 1) both 0.35s;
+}
+.party-unlock.is-bike {
+  --pad: #b45cff;
+}
+@keyframes loading-spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@keyframes party-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes party-title {
+  from {
+    transform: scale(0.2) rotate(-12deg);
+    opacity: 0;
+  }
+}
+@keyframes party-card {
+  from {
+    transform: translateY(30px) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* Wins pad confetti (ui/confetti.js). */
+.confetti-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 26;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
 }
 
 @keyframes pop-in {
@@ -957,10 +1396,47 @@ button {
   box-shadow: 0 5px 0 rgba(0, 0, 0, 0.18);
   text-align: center;
 }
+/* Row cards (quests, settings): the plain .card rule above would win over the
+   utility classes, so the row layout is spelled out here. */
+.card.flex-row {
+  flex-direction: row;
+}
+.card.text-left {
+  text-align: left;
+}
 .card.is-equipped {
   background: #e9ffe9;
   outline: 4px solid #2fcf4a;
   outline-offset: -10px;
+}
+/* A green tick on the corner of whatever is equipped. */
+.card.is-equipped::after {
+  content: '✓';
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 4px solid var(--ink);
+  border-radius: 50%;
+  background: linear-gradient(#6af07a, #22b544);
+  box-shadow: 0 3px 0 var(--ink);
+  color: #fff;
+  font: 800 22px 'Fredoka', system-ui, sans-serif;
+  animation: tick-pop 0.35s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes tick-pop {
+  from {
+    transform: scale(0);
+  }
+}
+.equipped-btn:disabled {
+  cursor: default;
+  opacity: 1;
+  filter: none;
 }
 .card.is-highlight {
   animation: highlight 1.2s ease-in-out infinite;

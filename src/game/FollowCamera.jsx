@@ -47,7 +47,7 @@ export function FollowCamera() {
   const camera = useThree((s) => s.camera)
   const gl = useThree((s) => s.gl)
   const look = useRef(new Vector3())
-  const state = useRef({ lastDrag: -10, seenTeleport: -1, initialised: false })
+  const state = useRef({ lastDrag: -10, seenTeleport: -1, initialised: false, shakeOffset: new Vector3() })
 
   useEffect(() => {
     const el = gl.domElement
@@ -120,6 +120,10 @@ export function FollowCamera() {
       return
     }
 
+    // Undo last frame's shake before following, so it never accumulates.
+    camera.position.sub(s.shakeOffset)
+    s.shakeOffset.set(0, 0, 0)
+
     const lp = localPlayer
     _target.copy(lp.position)
     _target.y += LOOK_HEIGHT
@@ -153,6 +157,13 @@ export function FollowCamera() {
       camera.position.lerp(_desired, 1 - Math.exp(-dt * 14))
     }
     camera.lookAt(look.current)
+    if (cameraRig.shake > 0.003) {
+      // A quick, decaying jolt (mostly vertical) after hard landings.
+      const k = cameraRig.shake
+      s.shakeOffset.set(Math.sin(now * 61) * k * 0.6, Math.sin(now * 83 + 1.7) * k, Math.sin(now * 47 + 0.4) * k * 0.4)
+      camera.position.add(s.shakeOffset)
+      cameraRig.shake *= Math.exp(-dt * 8)
+    } else cameraRig.shake = 0
     const fov = BASE_FOV + SPEED_FOV * speedFeel.amount + 5 * speedFeel.kick
     setFov(camera, camera.fov + (fov - camera.fov) * (1 - Math.exp(-dt * 4)))
   })

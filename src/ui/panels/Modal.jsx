@@ -80,8 +80,8 @@ export function Price({ currency, value }) {
 export function OwnButton({ owned, equipped, currency, price, me, onBuy, onEquip, buyLabel }) {
   if (equipped) {
     return (
-      <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
-        EQUIPPED
+      <button type="button" className="btn-chunky btn-green card-button equipped-btn game-text" disabled>
+        ✓ EQUIPPED
       </button>
     )
   }

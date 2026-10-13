@@ -11,14 +11,14 @@ import {
   TRAIN_PAD_BY_ID,
   bikeSpeedFor,
   formatDuration,
-  formatNumber,
   jumpsFor,
   padUnlocked,
   worldUnlocked,
+  parseRecords,
 } from '../shared/gameData.js'
-import { LOBBY_FRONT_Z, getLayout, inHazardPit, insideBox, killHeightAt, stageAt, trainPadAt, worldIdAt } from '../shared/layout.js'
+import { LOBBY_FRONT_Z, getLayout, inHazardPit, insideBox, killHeightAt, stageAt, starsFor, trainPadAt, worldIdAt } from '../shared/layout.js'
 import { gameState, useGameStore } from '../store/gameStore'
-import { flashScreen, spawnTrickPopup } from '../ui/fx'
+import { flashScreen, spawnStagePopup, spawnTrickPopup } from '../ui/fx'
 import { burst } from './burst'
 import { cameraRig } from './cameraRig'
 import { hazardTime, touchingHazard } from './hazards'
@@ -191,7 +191,7 @@ export function LocalPlayer() {
     const maxJumps = jumpsFor(level)
     // A rebirth mid-air drops the level; never keep more jumps than it allows.
     lp.jumpsLeft = Math.min(lp.jumpsLeft, maxJumps)
-    const maxSpeed = Math.min(bikeSpeedFor(level, store.me?.bikeUpg ?? 0), PHYSICS.maxMoveSpeed)
+    const maxSpeed = Math.min(bikeSpeedFor(store.me?.totalSpeed ?? 0), PHYSICS.maxMoveSpeed)
 
     // --- Steering: camera-relative, the bike turns smoothly towards the input.
     const { forward, strafe } = store.chatOpen ? { forward: 0, strafe: 0 } : moveAxes()
@@ -232,7 +232,6 @@ export function LocalPlayer() {
       c.lastJumpAt = now
       sound.airJump()
       send('jump', { air: true })
-      burst(lp.position, { color: '#ffffff', count: 12, speed: 7, up: 1, life: 0.45, gravity: 2 })
     }
     const airJump = () => {
       lp.velocity.y = PHYSICS.jumpVelocity
@@ -268,9 +267,11 @@ export function LocalPlayer() {
     if (landed) {
       c.landedAt = now
       if (c.fallSpeed > 30) {
+        // Rider draws the squash and dust; the camera gives a small kick.
+        motion.landPower = Math.min(1, Math.max(0.3, (c.fallSpeed - 30) / 110 + 0.3))
         motion.landAt = now
+        cameraRig.shake = Math.max(cameraRig.shake, 0.12 + 0.45 * motion.landPower)
         sound.land()
-        burst(lp.position, { color: '#e8e8e8', count: 14, speed: 8, up: 2, life: 0.5, gravity: 6 })
       }
       c.fallSpeed = 0
     }
@@ -313,9 +314,11 @@ export function LocalPlayer() {
     // --- Treadmills.
     if ((onBelt?.id ?? null) !== c.trainId) {
       c.trainId = onBelt?.id ?? null
+      if (store.training) useGameStore.setState({ training: null })
       if (onBelt && store.me) {
         const def = TRAIN_PAD_BY_ID[onBelt.id]
-        if (padUnlocked(def, store.me)) store.toast(`${formatNumber(def.mult)}x Speed treadmill!`, 'success', 1600)
+        // The HUD's treadmill counter (what this session on the belt earns).
+        if (padUnlocked(def, store.me)) useGameStore.setState({ training: { label: def.label, mult: def.mult, color: def.color, gained: 0, since: Date.now() } })
         else if (def.world === 2 && !worldUnlocked(2, store.me)) store.toast('Unlock World 2 first!', 'error', 1800)
         else if (def.wins) store.openPanel('pad', { pad: def.id, trigger: `pad:${def.id}` })
         else store.toast(`Needs Rebirth ${def.rebirths}+`, 'error', 1800)
@@ -340,8 +343,20 @@ export function LocalPlayer() {
     if (stage && stage.gid > c.bannerStage && z <= stage.plateauZ0 - 1 && y >= stage.floorY - 0.5) {
       c.bannerStage = stage.gid
       sound.win()
+      useGameStore.setState({ cleared: Date.now() })
+      // Stage record: time since leaving the lobby this run.
+      if (c.runStart) {
+        const ms = Math.round(performance.now() - c.runStart)
+        const previous = parseRecords(store.me?.records)[stage.gid]
+        const isRecord = !previous || ms < previous
+        spawnStagePopup({ name: stage.name, index: stage.index, ms, stars: starsFor(stage, ms), record: isRecord, previous })
+        if (isRecord) send('record', { gid: stage.gid, ms })
+      }
     }
     const onCourse = z < LOBBY_FRONT_Z
+    // The record timer starts as you ride out of the lobby (and stops when you go back).
+    if (onCourse && !store.onCourse) c.runStart = performance.now()
+    else if (!onCourse) c.runStart = 0
     if (onCourse !== store.onCourse || lp.world !== store.world) useGameStore.setState({ onCourse, world: lp.world })
 
     // --- "Jump: 7/11" while airborne and for a moment after landing.

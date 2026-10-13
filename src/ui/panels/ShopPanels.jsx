@@ -8,10 +8,16 @@ import {
   TRAILS,
   TRAIN_PADS,
   TRAIN_PAD_BY_ID,
+  TUNE_UP_MAX,
   bikeSpeedFor,
-  bikeSpeedUpgradeCost,
+  tuneUpBonus,
+  tuneUpCost,
   formatNumber,
   parseList,
+  COLLECTIBLES,
+  RARITY_COLORS,
+  collectionCount,
+  fasterLabel,
 } from '../../shared/gameData.js'
 import { BikeIcon } from '../icons'
 import { Grid, Modal, OwnButton, Price, Tabs } from './Modal'
@@ -43,16 +49,43 @@ function AuraPreview({ color, none }) {
   )
 }
 
+/** A rarity tag in the rarity's colour. */
+export function RarityChip({ rarity }) {
+  return (
+    <div className="chip rarity-chip text-white" style={{ background: RARITY_COLORS[rarity] }}>
+      {rarity.toUpperCase()}
+    </div>
+  )
+}
+
+/** "Collection 7/30": trails and auras collected, with a bar. */
+export function CollectionCounter({ me }) {
+  const have = collectionCount(me)
+  const total = COLLECTIBLES.length
+  return (
+    <div className="collection-counter">
+      <span className="game-text">
+        🗂️ Collection {have}/{total}
+      </span>
+      <div className="collection-bar">
+        <div style={{ width: `${(have / total) * 100}%` }} />
+      </div>
+    </div>
+  )
+}
+
 export function ItemsPanel({ me, props }) {
   const [tab, setTab] = useState(props.tab || 'trails')
   const tabs = <Tabs tabs={[['trails', '☄️ Trails'], ['auras', '🔮 Auras']]} value={tab} onChange={setTab} color="#2fb5ff" />
   return (
-    <Modal title="Item Shop" icon="🛒" color="#2fb5ff" tabs={tabs}>
+    <Modal title="Trails & Auras" icon="🛒" color="#2fb5ff" tabs={tabs}>
+      <CollectionCounter me={me} />
       {tab === 'trails' ? (
         <Grid>
           {TRAILS.map((trail) => (
             <div key={trail.id} className={`card ${me.trail === trail.id ? 'is-equipped' : ''}`}>
               <TrailPreview colors={trail.colors} />
+              {trail.id !== 'none' && <RarityChip rarity={trail.rarity} />}
               <div className="ink-text text-[22px] font-bold">{trail.name}</div>
               <div className="chip bg-[#e6ffe9] text-[#1d7a2f]">+{Math.round(trail.bonus * 100)}% Speed</div>
               <OwnButton
@@ -75,6 +108,7 @@ export function ItemsPanel({ me, props }) {
               className={`card ${me.aura === aura.id ? 'is-equipped' : ''} ${props.highlight === aura.id ? 'is-highlight' : ''}`}
             >
               <AuraPreview color={aura.color} none={aura.id === 'none'} />
+              {aura.id !== 'none' && <RarityChip rarity={aura.rarity} />}
               <div className="ink-text text-[22px] font-bold">{aura.name}</div>
               <div className="chip bg-[#fff6d6] text-[#9a6a00]">{aura.winsMult}x Wins</div>
               <OwnButton
@@ -98,21 +132,16 @@ export function ItemsPanel({ me, props }) {
  * Bikes
  * ------------------------------------------------------------------------- */
 
-/** The best speed multiplier among the bikes a player owns. */
-function bestOwnedMult(me) {
-  return BIKES.filter((b) => owns(me, 'bike', b.id)).reduce((max, b) => Math.max(max, b.mult), 1)
-}
-
 export function BikeCard({ me, bike, highlight }) {
   const locked = !bikeAvailable(bike, me)
-  const best = bestOwnedMult(me)
-  const faster = bike.mult > best ? Math.round((bike.mult / best - 1) * 100) : 0
+  const faster = fasterLabel(bike, me)
   return (
     <div className={`card ${me.bike === bike.id ? 'is-equipped' : ''} ${highlight ? 'is-highlight' : ''}`}>
       <BikeIcon frame={bike.frame} rim={bike.rim} accent={bike.accent} size={120} />
+      <RarityChip rarity={bike.rarity} />
       <div className="ink-text text-[22px] font-bold">{bike.name}</div>
       <div className="chip bg-[#e6f3ff] text-[#1d5aa8]">{formatNumber(bike.mult)}x Speed</div>
-      {faster > 0 && !owns(me, 'bike', bike.id) && <div className="ink-text text-[14px] font-bold text-[#2fbf4a]">{formatNumber(faster)}% faster than your best bike!</div>}
+      {faster && !owns(me, 'bike', bike.id) && <div className="ink-text text-[14px] font-bold text-[#2fbf4a]">{faster} than your best bike!</div>}
       {locked ? (
         <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
           🔒 WORLD 2
@@ -133,20 +162,32 @@ export function BikeCard({ me, bike, highlight }) {
 }
 
 function BikeSpeedCard({ me }) {
-  const cost = bikeSpeedUpgradeCost(me.bikeUpg)
-  const speed = bikeSpeedFor(me.level, me.bikeUpg)
+  const count = me.bikeUpg || 0
+  const maxed = count >= TUNE_UP_MAX
+  const cost = tuneUpCost(count)
+  const pct = (n) => `+${Math.round(tuneUpBonus(n) * 100)}%`
   return (
     <div className="card mb-4 flex-row justify-between gap-4 px-5 text-left">
       <div className="text-[64px]">✏️</div>
       <div className="flex-1">
-        <div className="ink-text text-[26px] font-bold">Max Bike Speed</div>
-        <div className="game-text text-[38px] text-[#7fc4ff]">
-          {speed} → {speed + 1}
+        <div className="ink-text text-[26px] font-bold">
+          Tune-ups {count}/{TUNE_UP_MAX}
         </div>
-        <div className="ink-text text-[16px] opacity-70">Levels add +3 each. Upgrades are permanent.</div>
+        <div className="game-text text-[38px] text-[#7fc4ff]">
+          {pct(count)} Speed{maxed ? '' : ` → ${pct(count + 1)}`}
+        </div>
+        <div className="ink-text text-[16px] opacity-70">
+          Each tune-up makes you gain Speed faster. Your Max Bike Speed ({Math.round(bikeSpeedFor(me.totalSpeed))}) comes from your Speed.
+        </div>
       </div>
       <div className="w-[170px]">
-        <OwnButton me={me} currency="wins" price={cost} onBuy={action('buy', { cat: 'bikeSpeed' })} buyLabel={<>+1 Speed · <Price currency="wins" value={cost} /></>} />
+        {maxed ? (
+          <button type="button" className="btn-chunky btn-gray card-button game-text" disabled>
+            MAXED
+          </button>
+        ) : (
+          <OwnButton me={me} currency="wins" price={cost} onBuy={action('buy', { cat: 'bikeSpeed' })} buyLabel={<>Tune up · <Price currency="wins" value={cost} /></>} />
+        )}
       </div>
     </div>
   )

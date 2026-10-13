@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store/gameStore'
 import { FeedbackPanel, ItemShopPanel } from './ItemShopPanel'
+import { DailyRewardPanel, OfflinePanel } from './RetentionPanels'
 import {
   CodesPanel,
   InventoryPanel,
@@ -48,6 +49,10 @@ function renderPanel(id, me, props) {
       return <WelcomePanel />
     case 'itemShop':
       return <ItemShopPanel me={me} />
+    case 'dailyReward':
+      return <DailyRewardPanel me={me} />
+    case 'offline':
+      return <OfflinePanel props={props} />
     case 'feedback':
       return <FeedbackPanel />
     default:

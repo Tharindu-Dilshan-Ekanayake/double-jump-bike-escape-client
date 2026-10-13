@@ -16,7 +16,20 @@ import {
   TorusGeometry,
 } from 'three'
 
-import { AURA_BY_ID, BIKE_BY_ID, BIKES, PRODUCTS, TRAIN_PAD_BY_ID, formatNumber } from '../../shared/gameData.js'
+import {
+  AURA_BY_ID,
+  BIKE_BY_ID,
+  PRODUCTS,
+  RARITIES,
+  RARITY_COLORS,
+  TRAIN_PAD_BY_ID,
+  bikeAvailable,
+  fasterLabel,
+  formatNumber,
+  parseList,
+  formatDuration,
+  nextRestockAt,
+} from '../../shared/gameData.js'
 import { HALF_WIDTH, getLayout } from '../../shared/layout.js'
 import { sweepLaserZ, sweeperAngle, verticalLaserY } from '../hazards'
 import { createBike } from '../rider/bikeModel'
@@ -110,14 +123,16 @@ export function buildWorld() {
   for (const mesh of batch.build()) root.add(mesh)
   for (const extra of extras) root.add(extra)
 
-  buildShopSigns(layout, root)
+  buildShopSigns(layout, root, animated)
   buildPortals(layout, props, root, animated)
   buildSigns(layout, root)
-  buildStands(layout, root, animated)
+  const standCuller = { replace: null }
+  const stands = buildStands(layout, root, animated, props, standCuller)
   const hazards = buildHazards(layout, root)
 
   // Signs, stands, lasers and portals: hidden when the camera is far away.
   const culler = createDistanceCuller(root.children)
+  standCuller.replace = culler.replace
 
   // Portals add props after the first merge; merge those too.
   for (const mesh of batch.build()) root.add(mesh)
@@ -126,6 +141,10 @@ export function buildWorld() {
     root,
     updateLeaderboards(data) {
       for (const board of boards) board.update(data)
+    },
+    /** Re-labels the bike stands for this player (owned, equipped, "% faster"). */
+    updateStands(me) {
+      stands.update(me)
     },
     update(t, dt, camera) {
       animateMaterials(dt)
@@ -166,6 +185,11 @@ function createDistanceCuller(objects) {
   }
   let wait = 0
   return {
+    /** Keeps culling `next` where `previous` was (stand labels are redrawn). */
+    replace(previous, next) {
+      const item = items.find((i) => i.object === previous)
+      if (item) item.object = next
+    },
     update(position, dt) {
       wait -= dt
       if (wait > 0) return
@@ -215,11 +239,15 @@ function buildSigns(layout, root) {
     } else if (sign.kind === 'worldTitle') {
       object = textSprite([{ text: sign.text, size: 150, font: FONT_TITLE, weight: 400, fill: ['#ffd6ff', '#9b5cff'], strokeWidth: 16 }], { height: 7 })
     } else if (sign.kind === 'jumpWall') {
-      object = jumpWallSign(sign.jumps, sign.width, sign.starter, sign.gap)
+      object = jumpWallSign(sign.speed, sign.width, sign.starter)
     } else if (sign.kind === 'stageTitle') {
-      object = textSprite([{ text: sign.text, size: 110, font: FONT_TITLE, weight: 400, fill: TITLE_FILLS[sign.theme] || TITLE_FILLS.starter, strokeWidth: 14 }], {
-        height: 6.5,
-      })
+      object = textSprite(
+        [
+          { text: sign.text, size: 110, font: FONT_TITLE, weight: 400, fill: TITLE_FILLS[sign.theme] || TITLE_FILLS.starter, strokeWidth: 14 },
+          { text: `⚡ ${formatNumber(sign.speed)} Speed`, size: 64, font: FONT_TITLE, weight: 400, fill: ['#fff47a', '#ffb81f'], strokeWidth: 10 },
+        ],
+        { height: 9.5 },
+      )
     } else if (sign.kind === 'padLabel') {
       object =
         sign.pad === 'return'
@@ -390,11 +418,36 @@ function buildShops(layout, props) {
   }
 }
 
-function buildShopSigns(layout, root) {
+function buildShopSigns(layout, root, animated) {
   for (const shop of layout.shops) {
     const sign = textSprite([{ text: `${SHOP_ICONS[shop.id]} ${shop.title}`, size: 74 }], { height: 3.8, background: shop.color, border: '#ffffff' })
     sign.position.set(shop.x + 1, 13.6, shop.z)
     root.add(sign)
+    if (shop.id === 'items') animated.push(restockTimer(root, shop.x + 1, 16.6, shop.z))
+  }
+}
+
+/** A live "Restock in 3:42" countdown under the Item Shop sign (redrawn each second). */
+function restockTimer(root, x, y, z) {
+  let sprite = null
+  let shown = ''
+  return {
+    update() {
+      const now = Date.now()
+      const text = `⏱ Restock in ${formatDuration(nextRestockAt(now) - now)}`
+      if (text === shown) return
+      shown = text
+      const next = textSprite([{ text, size: 52, fill: '#ffe27a' }], { height: 2.4, background: '#1f2a4a', border: '#ffe27a' })
+      next.position.set(x, y, z)
+      if (sprite) {
+        next.visible = sprite.visible
+        root.remove(sprite)
+        sprite.material.map?.dispose()
+        sprite.material.dispose()
+      }
+      root.add(next)
+      sprite = next
+    },
   }
 }
 
@@ -450,22 +503,45 @@ function buildTreadmillProps(layout, props) {
   }
 }
 
-function bikeLabel(def, style) {
-  const best = BIKES.reduce((max, b) => Math.max(max, b.mult), 1)
+/** What a stand's label says for this player; redrawn only when it changes. */
+function bikeLabelLines(def, me) {
+  const owned = def.id === 'starter' || parseList(me?.owned).includes(`bike:${def.id}`)
+  let status = { text: def.price ? `🏆 ${formatNumber(def.price)}` : 'FREE', size: 44, fill: '#ffd23a' }
+  if (me?.bike === def.id) status = { text: '✓ EQUIPPED', size: 44, fill: '#7dff8a' }
+  else if (owned) status = { text: 'OWNED · Press E', size: 40, fill: '#bfe9ff' }
   const lines = [
-    { text: 'NEW!', size: 40, fill: ['#ff6b6b', '#ffd23a', '#5fe08a'] },
+    { text: def.rarity.toUpperCase(), size: 38, fill: RARITY_COLORS[def.rarity] },
     { text: def.name, size: 58, fill: ['#ffffff', '#cde8ff'] },
     { text: `${formatNumber(def.mult)}x Speed`, size: 38, fill: '#7dff8a' },
-    { text: def.price ? `🏆 ${formatNumber(def.price)}` : 'FREE', size: 44, fill: '#ffd23a' },
-    { text: 'Press E', size: 34, fill: '#ffffff' },
+    status,
   ]
-  if (style === 'gallery' && def.mult === best) lines[0] = { text: 'BEST!', size: 40, fill: ['#ffd23a', '#ff8a1f'] }
-  return textSprite(lines, { height: 5.4 })
+  const faster = me && !owned ? fasterLabel(def, me) : ''
+  if (me && !bikeAvailable(def, me)) lines.push({ text: '🔒 Unlock World 2', size: 34, fill: '#ff9a9a' })
+  else if (faster) lines.push({ text: `${faster} than your best bike!`, size: 32, fill: '#7dff8a' })
+  if (!owned) lines.push({ text: 'Press E', size: 30, fill: '#ffffff' })
+  return lines
 }
 
-function buildStands(layout, root, animated) {
+/** A round pedestal in the bike's rarity colour (merged into the lobby's props). */
+function pedestal(p, x, z, rarity) {
+  const color = RARITY_COLORS[rarity]
+  p.cylinder('#2b3245', [x, 0.25, z], 5.6, 5.9, 0.5, { segments: 28 })
+  p.cylinder(color, [x, 0.6, z], 5.3, 5.4, 0.25, { segments: 28 })
+  p.cylinder('#eef2f8', [x, 0.66, z], 4.6, 4.6, 0.14, { segments: 28 })
+  p.torus(color, [x, 0.74, z], 5.1, 0.13, { rot: [Math.PI / 2, 0, 0], glow: true })
+  // Higher rarities get glowing gems round the rim.
+  const gems = Math.max(0, RARITIES.indexOf(rarity) - 1) * 2
+  for (let i = 0; i < gems; i += 1) {
+    const a = (i / gems) * Math.PI * 2
+    p.sphere(color, [x + Math.cos(a) * 5.5, 0.62, z + Math.sin(a) * 5.5], 0.32, { glow: true })
+  }
+}
+
+function buildStands(layout, root, animated, props, cullerRef) {
+  const labels = []
   for (const stand of layout.bikeStands) {
     const def = BIKE_BY_ID[stand.bike]
+    if (stand.style === 'gallery') pedestal(props(Math.round(stand.world) * 100), stand.x, stand.z, def.rarity)
     const bike = createBike(stand.bike, { still: true })
     // Display bikes are drawn often (a lobby full of them); skip their shadows.
     bike.group.traverse((node) => {
@@ -477,9 +553,10 @@ function buildStands(layout, root, animated) {
     root.add(bike.group)
     const spin = gallery ? 0.5 : 0.7
     animated.push({ update: (t) => (bike.group.rotation.y = t * spin + stand.z) })
-    const label = bikeLabel(def, stand.style)
-    label.position.set(stand.x, 8.2, stand.z)
+    const label = textSprite(bikeLabelLines(def, null), { height: 6 })
+    label.position.set(stand.x, 8.4, stand.z)
     root.add(label)
+    labels.push({ def, stand, sprite: label, key: '' })
   }
 
   for (const stand of layout.auraStands) {
@@ -488,19 +565,39 @@ function buildStands(layout, root, animated) {
     aura.group.position.set(stand.pos[0], stand.pos[1], stand.pos[2])
     root.add(aura.group)
     animated.push({ update: (t) => aura.update(t) })
-    const unchained = stand.aura === 'unchained'
-    const price = `🏆 ${formatNumber(AURA_BY_ID[stand.aura].price)}`
+    const def = AURA_BY_ID[stand.aura]
     const label = textSprite(
       [
-        { text: 'NEW!', size: 40, fill: ['#ff6b6b', '#ffd23a', '#5fe08a'] },
-        { text: unchained ? 'Unchained Aura' : 'Shadow Aura', size: 54, fill: unchained ? ['#ff9a9a', '#ff2f4d'] : ['#e6d6ff', '#9b5cff'] },
-        { text: unchained ? '10x Wins' : '3x Wins', size: 38, fill: '#ffe27a' },
-        { text: price, size: 44, fill: '#ffd23a' },
+        { text: def.rarity.toUpperCase(), size: 38, fill: RARITY_COLORS[def.rarity] },
+        { text: def.name, size: 54, fill: ['#ffffff', def.color] },
+        { text: `${formatNumber(def.winsMult)}x Wins`, size: 38, fill: '#ffe27a' },
+        { text: `🏆 ${formatNumber(def.price)}`, size: 44, fill: '#ffd23a' },
       ],
       { height: 5.4 },
     )
     label.position.set(stand.pos[0], 7.6, stand.pos[2])
     root.add(label)
+  }
+
+  return {
+    update(me) {
+      for (const entry of labels) {
+        const lines = bikeLabelLines(entry.def, me)
+        const key = lines.map((l) => l.text).join('|')
+        if (key === entry.key) continue
+        entry.key = key
+        const next = textSprite(lines, { height: 6 })
+        next.position.copy(entry.sprite.position)
+        next.visible = entry.sprite.visible
+        root.add(next)
+        root.remove(entry.sprite)
+        entry.sprite.material.map?.dispose()
+        entry.sprite.material.dispose()
+        // The distance culler keeps a reference: swap the object it hides.
+        cullerRef.replace?.(entry.sprite, next)
+        entry.sprite = next
+      }
+    },
   }
 }
 
