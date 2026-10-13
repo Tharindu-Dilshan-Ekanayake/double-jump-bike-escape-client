@@ -5,6 +5,7 @@ import { Vector3 } from 'three'
 import { sound } from '../audio/sound'
 import { chatBubbles, mySessionId, send } from '../net/connection'
 import {
+  CONTINUE_RULES,
   DOUBLE_PAD_WINS,
   canUseDoublePad,
   PHYSICS,
@@ -15,10 +16,12 @@ import {
   padUnlocked,
   worldUnlocked,
   parseRecords,
+  trainingEstimate,
 } from '../shared/gameData.js'
 import { LOBBY_FRONT_Z, getLayout, inHazardPit, insideBox, killHeightAt, stageAt, starsFor, trainPadAt, worldIdAt } from '../shared/layout.js'
 import { gameState, useGameStore } from '../store/gameStore'
 import { flashScreen, spawnStagePopup, spawnTrickPopup } from '../ui/fx'
+import { freeContinuesLeft } from '../ui/serverClock'
 import { burst } from './burst'
 import { cameraRig } from './cameraRig'
 import { hazardTime, touchingHazard } from './hazards'
@@ -90,8 +93,8 @@ export function LocalPlayer() {
   const [bubble, setBubble] = useState(null)
 
   const look = useMemo(
-    () => ({ bike: me?.bike ?? 'starter', trail: me?.trail ?? 'none', aura: me?.aura ?? 'none', seed: me?.name }),
-    [me?.bike, me?.trail, me?.aura, me?.name],
+    () => ({ bike: me?.bike ?? 'starter', trail: me?.trail ?? 'none', aura: me?.aura ?? 'none', pets: me?.petsEquipped ?? '', seed: me?.name }),
+    [me?.bike, me?.trail, me?.aura, me?.petsEquipped, me?.name],
   )
 
   const ctl = useRef({
@@ -107,6 +110,8 @@ export function LocalPlayer() {
     trigger: null,
     bannerStage: 0,
     deadUntil: 0,
+    /** Waiting on the "Continue?" question after a fall. */
+    awaitingPrompt: false,
     teleportAt: 0,
     debugTeleport: import.meta.env.DEV ? Number(new URLSearchParams(window.location.search).get('tp')) || 0 : 0,
   })
@@ -180,6 +185,30 @@ export function LocalPlayer() {
       c.teleportAt = 0
       flashScreen('teleport')
       respawn()
+    }
+    if (c.awaitingPrompt) {
+      if (store.continueTo) {
+        // The server said yes: back on the last island, facing the next gap.
+        const island = layout.stages.find((st) => st.gid === store.continueTo)
+        c.awaitingPrompt = false
+        useGameStore.setState({ continueTo: 0 })
+        if (island) {
+          lp.world = island.world
+          lp.position.set(island.originX, island.floorY + 0.5, island.plateauZ0 - 12)
+          lp.velocity.set(0, 0, 0)
+          lp.yaw = Math.PI
+          lp.grounded = true
+          lp.teleportedAt = performance.now()
+          lp.jumpsLeft = jumpsFor(store.me?.level ?? 1)
+          // Records only count for a run straight from the lobby.
+          c.runStart = 0
+          flashScreen('teleport')
+          store.toast(`▶ Continuing from ${island.name}!`, 'success', 1800)
+        } else respawn()
+      } else if (!store.deathPrompt) {
+        c.awaitingPrompt = false
+        respawn()
+      } else return
     }
     if (c.deadUntil) {
       if (now < c.deadUntil) return
@@ -282,14 +311,35 @@ export function LocalPlayer() {
     // --- Hazards: a laser, or falling into a gap, sends you all the way back to the lobby.
     const fell = inHazardPit(layout, x, y, z)
     if (fell || touchingHazard(layout, lp.position, hazardTime()) || y < killHeightAt()) {
-      c.deadUntil = now + 0.7
       lp.velocity.set(0, 0, 0)
       motion.speed = 0
       sound.death()
       flashScreen('death')
       burst(_probe.set(x, y + 2, z), { color: fell ? '#ffb21f' : '#ff4040', count: 40, speed: 12, up: 8, life: 0.9, gravity: 18 })
-      store.toast(fell ? '😵 You fell! Back to the lobby!' : 'Oops! Back to the start!', 'error', 1800)
       useGameStore.setState({ jump: null })
+      const me = store.me
+      // In a gap you're too slow for: say how much Speed is missing and how long it takes to train.
+      const gapStage = stageAt(layout, x, z)
+      const missing = gapStage && z > gapStage.wallZ && me ? gapStage.speed - me.totalSpeed : 0
+      if (missing > 0) {
+        const { seconds, pad } = trainingEstimate(me, missing, Math.max(0, store.playerCount - 1))
+        useGameStore.setState({
+          gateFail: { stage: gapStage.name, need: gapStage.speed, have: me.totalSpeed, missing, seconds, pad: pad.label, padMult: pad.mult, at: Date.now() },
+        })
+        c.deadUntil = now + 0.7
+        return
+      }
+      // A slip after reaching an island this run: offer to continue from it.
+      const island = c.bannerStage && layout.stages.find((st) => st.gid === c.bannerStage)
+      const canContinue = island && !island.isFinish && (freeContinuesLeft(me) > 0 || CONTINUE_RULES.rewardedAds)
+      if (canContinue) {
+        sendMoveNow(c)
+        c.awaitingPrompt = true
+        useGameStore.setState({ deathPrompt: { gid: island.gid, islandName: island.name, at: Date.now() }, continueTo: 0 })
+        return
+      }
+      c.deadUntil = now + 0.7
+      store.toast(fell ? '😵 You fell! Back to the lobby!' : 'Oops! Back to the start!', 'error', 1800)
       return
     }
 

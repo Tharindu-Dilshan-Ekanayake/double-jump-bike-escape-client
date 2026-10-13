@@ -16,7 +16,10 @@ import {
   worldUnlocked,
   REBIRTH_MILESTONES,
   rebirthPreview,
+  STAR_REWARDS,
+  parseRecords,
 } from '../../shared/gameData.js'
+import { starMax, starTotal } from '../../shared/layout.js'
 import { gameState, useGameStore } from '../../store/gameStore'
 import { useNow } from '../useNow'
 import { BikeIcon } from '../icons'
@@ -186,11 +189,45 @@ export function RebirthPanel({ me }) {
  * Quests
  * ------------------------------------------------------------------------- */
 
+const STAR_TIER_ICON = { trail: '☄️', aura: '🔮', bike: '🚲', wins: '🏆' }
+
+/** Stars from stage records unlock these, once each (the server hands them out). */
+function StarRewards({ me }) {
+  const total = starTotal(parseRecords(me.records))
+  const max = starMax()
+  return (
+    <>
+      <h3 className="game-text mb-2 text-[26px]">
+        ⭐ Star Rewards · {total}/{max}
+      </h3>
+      <div className="progress-mini star-progress mb-3">
+        <div style={{ width: `${(total / max) * 100}%` }} />
+      </div>
+      <div className="star-tiers mb-2">
+        {STAR_REWARDS.map((tier, i) => {
+          const got = i < (me.starTiers ?? 0)
+          const kind = ['trail', 'aura', 'bike'].find((k) => tier[k]) ?? 'wins'
+          return (
+            <div key={tier.stars} className={`star-tier ${got ? 'is-got' : ''}`}>
+              {got && <span className="tick-badge">✓</span>}
+              <span className="text-[36px] leading-none">{STAR_TIER_ICON[kind]}</span>
+              <span className="ink-text text-[14px] font-bold leading-tight">{describeReward(tier)}</span>
+              <span className="star-need game-text">⭐ {tier.stars}</span>
+            </div>
+          )
+        })}
+      </div>
+      <p className="ink-text mb-5 text-center text-[15px] opacity-80">Beat a stage&apos;s par time for up to 3 stars. Records count on runs straight from the lobby.</p>
+    </>
+  )
+}
+
 export function QuestsPanel({ me }) {
   const rows = questRows(me)
   return (
     <Modal title="Quests" icon="📜" color="#32c94a" width="min(720px, 94vw)">
       <DailyQuests me={me} />
+      <StarRewards me={me} />
       <h3 className="game-text mb-2 text-[26px]">📜 Quest Lines</h3>
       <div className="flex flex-col gap-3">
         {rows.map(({ quest, target, progress, ready, done, reward }) => (

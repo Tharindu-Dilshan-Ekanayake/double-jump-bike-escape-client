@@ -17,6 +17,14 @@ import {
   parseRecords,
   RARITY_COLORS,
   formatDuration,
+  EGGS,
+  MAX_PETS_EQUIPPED,
+  PLAYTIME_GIFTS,
+  WORLD2_UNLOCK,
+  describeReward,
+  parseList,
+  resolveReward,
+  worldUnlocked,
 } from '../shared/gameData.js'
 import { getLayout, starsFor } from '../shared/layout.js'
 import { gameState, useGameStore } from '../store/gameStore'
@@ -25,6 +33,8 @@ import { RebirthIcon, TrophyIcon } from './icons'
 import { BIKE_BY_ID } from '../shared/gameData.js'
 import { bikeStatus, rideBike } from './bikeAction'
 import { claimableDailyQuests, claimableQuests } from './panels/questStatus'
+import { DeathPrompt, HatchOverlay } from './PlayOverlays'
+import { serverNow } from './serverClock'
 import { useNow } from './useNow'
 
 const withClick = (fn) => () => {
@@ -68,13 +78,14 @@ function StatPill({ icon, value, onPlus }) {
   )
 }
 
-function Tile({ kind, emoji, label, alert, hotkey, onClick }) {
+function Tile({ kind, emoji, label, alert, hotkey, onClick, children }) {
   return (
     <button type="button" className={`tile tile-${kind} press`} onClick={onClick}>
       <KeyBadge k={hotkey} />
       <span className="tile-icon">{emoji}</span>
       <span className="tile-label game-text">{label}</span>
       {alert && <span className="alert-badge">!</span>}
+      {children}
     </button>
   )
 }
@@ -103,25 +114,106 @@ function NextBikeBar({ me }) {
   )
 }
 
+/** "04:59" (minutes may pass 60 for long waits). */
+function mmss(ms) {
+  const total = Math.max(0, Math.ceil(ms / 1000))
+  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
+/** Pets need a look: a free slot with a pet to fill it, or Wins for a first egg. */
+function petsAlert(me) {
+  const owned = parseList(me.pets).length
+  const equipped = parseList(me.petsEquipped).length
+  if (!owned) return me.wins >= EGGS[0].price
+  return equipped < Math.min(owned, MAX_PETS_EQUIPPED)
+}
+
+/** Lucky spin: counts down to the next free spin (it only recharges while you play). */
+function SpinTile({ me }) {
+  useNow(1000)
+  const left = me.spinReadyAt - serverNow()
+  const ready = left <= 0
+  return <Tile kind="spin" emoji="🎡" label={ready ? 'SPIN!' : formatDuration(left)} hotkey="L" alert={ready} onClick={open('spin')} />
+}
+
 function StatsColumn({ me }) {
   const canRebirth = me.totalSpeed >= rebirthSpeedFor(me.rebirths)
   return (
     <div className="hud-scaled hud-stats pointer-events-auto fixed left-3 top-1/2 flex -translate-y-[56%] flex-col gap-4">
       <StatPill icon={<TrophyIcon />} value={formatNumber(me.wins)} onPlus={open('winsShop')} />
       <NextBikeBar me={me} />
-      <div className="mt-3 grid grid-cols-2 gap-x-5 gap-y-9 pl-1">
+      <div className="tile-grid mt-3 grid grid-cols-2 gap-x-5 gap-y-9 pl-1">
         <Tile kind="trails" emoji="☄️" label="TRAILS" hotkey="T" onClick={open('items', { tab: 'trails' })} />
         <Tile kind="auras" emoji="🔮" label="AURAS" hotkey="U" onClick={open('items', { tab: 'auras' })} />
-        <Tile kind="rebirth" emoji={<RebirthIcon width="68" height="68" />} label="Rebirth" hotkey="R" alert={canRebirth} onClick={open('rebirth')} />
+        <Tile kind="rebirth" emoji={<RebirthIcon width="68" height="68" />} label="Rebirth" hotkey="R" alert={canRebirth} onClick={open('rebirth')}>
+          {/* Phones: the World 2 bar doesn't fit by the jump button, so it shrinks to a badge here. */}
+          {worldTwoPending(me) && (
+            <span className="w2-mini game-text">
+              🌍 {me.rebirths}/{WORLD2_UNLOCK.rebirths}
+            </span>
+          )}
+        </Tile>
         <Tile kind="inventory" emoji="🎒" label="INVENTORY" hotkey="I" onClick={open('inventory')} />
+        <Tile kind="pets" emoji="🐾" label="PETS" hotkey="P" alert={petsAlert(me)} onClick={open('pets')} />
+        <SpinTile me={me} />
       </div>
     </div>
   )
 }
 
 /* ---------------------------------------------------------------------------
- * Right: quests, bike speed, 2x speed, small buttons
+ * Right: quests, bike speed, 2x speed, small buttons, gifts
  * ------------------------------------------------------------------------- */
+
+/** Playtime gifts: "🎁 Next gift in 04:12", then a CLAIM button. Starts over each session. */
+function GiftChip({ me }) {
+  useNow(1000)
+  const gift = PLAYTIME_GIFTS[me.giftsClaimed]
+  if (!gift) {
+    return <div className="gift-chip is-done game-text">🎁 All {PLAYTIME_GIFTS.length} gifts claimed!</div>
+  }
+  const left = me.sessionStart + gift.minutes * 60_000 - serverNow()
+  const ready = left <= 0
+  const from = me.giftsClaimed ? PLAYTIME_GIFTS[me.giftsClaimed - 1].minutes : 0
+  const fill = ready ? 1 : Math.max(0, 1 - left / ((gift.minutes - from) * 60_000))
+  const claim = () => {
+    sound.click()
+    send('gift')
+  }
+  return (
+    <button type="button" className={`gift-chip press ${ready ? 'is-ready' : ''}`} onClick={ready ? claim : undefined} title="Playtime gifts">
+      <span className="gift-icon">🎁</span>
+      <span className="flex min-w-0 flex-1 flex-col leading-tight">
+        <span className="game-text text-[19px]">{ready ? 'CLAIM GIFT!' : `Next gift in ${mmss(left)}`}</span>
+        <span className="gift-prize">
+          {describeReward(resolveReward(gift, me))} · {me.giftsClaimed + 1}/{PLAYTIME_GIFTS.length}
+        </span>
+        <span className="gift-bar">
+          <span style={{ width: `${fill * 100}%` }} />
+        </span>
+      </span>
+    </button>
+  )
+}
+
+/** World 1 escaped, World 2 still waiting on rebirths. */
+const worldTwoPending = (me) => (me.bestStage ?? 0) >= WORLD2_UNLOCK.stage && !worldUnlocked(2, me)
+
+/** After escaping World 1: how many rebirths World 2 still needs. */
+function WorldTwoBar({ me }) {
+  if (!worldTwoPending(me)) return null
+  const fill = Math.min(1, me.rebirths / WORLD2_UNLOCK.rebirths)
+  return (
+    <button type="button" className="w2-bar press" onClick={open('rebirth')} title="World 2">
+      <span className="game-text text-[18px]">
+        🌍 Rebirth {me.rebirths}/{WORLD2_UNLOCK.rebirths} to World 2
+      </span>
+      <span className="next-bike-bar">
+        <span className="block h-full" style={{ width: `${fill * 100}%` }} />
+      </span>
+    </button>
+  )
+}
 
 function ActionsColumn({ me }) {
   const music = useGameStore((s) => s.settings.music)
@@ -170,6 +262,9 @@ function ActionsColumn({ me }) {
           <span>{music ? '🎵' : '🔇'}</span>
         </button>
       </div>
+
+      <GiftChip me={me} />
+      <WorldTwoBar me={me} />
     </div>
   )
 }
@@ -446,6 +541,13 @@ function RebirthCelebration() {
               <span className="game-text text-[16px] text-[#ffe27a]">Exclusive · {formatNumber(BIKE_BY_ID[id]?.mult)}x Speed</span>
             </div>
           ))}
+          {party.wins > 0 && (
+            <div className="party-unlock" style={{ '--pad': '#ffd23a' }}>
+              <span className="text-[40px]">🏆</span>
+              <span className="game-text text-[22px]">+{formatNumber(party.wins)} Wins</span>
+              <span className="game-text text-[16px] text-[#ffe27a]">Rebirth reward</span>
+            </div>
+          )}
           {party.treadmills.map((pad) => (
             <div key={pad.label} className="party-unlock" style={{ '--pad': pad.color }}>
               <span className="text-[40px]">🏋️</span>
@@ -512,6 +614,8 @@ const HOTKEYS = {
   KeyU: () => toggle('items', { tab: 'auras' }),
   KeyR: () => toggle('rebirth'),
   KeyI: () => toggle('inventory'),
+  KeyP: () => toggle('pets'),
+  KeyL: () => toggle('spin'),
   KeyQ: () => toggle('quests'),
   KeyB: () => toggle('bikeSpeed'),
   KeyX: (me) => buy2xSpeed(me),
@@ -561,18 +665,23 @@ export function Hud() {
   useHotkeys(phase === 'playing' ? me : null)
   if (phase !== 'playing' || !me) return null
   return (
-    <div className="pointer-events-none fixed inset-0 z-20">
-      <ProfileTag />
-      {onCourse && <ProgressBar />}
-      <Chat />
-      <StatsColumn me={me} />
-      <ActionsColumn me={me} />
-      <BottomHud me={me} />
-      <BikePrompt me={me} />
-      <TrainingChip />
-      <RebirthCelebration />
-      <Overlays />
-    </div>
+    <>
+      <div className="pointer-events-none fixed inset-0 z-20">
+        <ProfileTag />
+        {onCourse && <ProgressBar />}
+        <Chat />
+        <StatsColumn me={me} />
+        <ActionsColumn me={me} />
+        <BottomHud me={me} />
+        <BikePrompt me={me} />
+        <TrainingChip />
+        <RebirthCelebration />
+        <Overlays />
+      </div>
+      {/* Above the windows (a hatch starts from the Pets window). */}
+      <DeathPrompt me={me} />
+      <HatchOverlay />
+    </>
   )
 }
 

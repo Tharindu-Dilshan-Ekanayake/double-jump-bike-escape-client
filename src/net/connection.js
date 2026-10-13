@@ -3,7 +3,7 @@ import { Client } from '@colyseus/sdk'
 import { sound } from '../audio/sound'
 import { getSDK, safeCall } from '../bloxity/sdk'
 import { localPlayer } from '../game/playerState'
-import { ROOM_NAME, describeReward } from '../shared/gameData.js'
+import { ROOM_NAME, SPIN_REWARDS, describeReward } from '../shared/gameData.js'
 import { courseProgress, getLayout, worldIdAt } from '../shared/layout.js'
 import { gameState, useGameStore } from '../store/gameStore'
 import { spawnGainPopup, spawnRewardPopup } from '../ui/fx'
@@ -68,9 +68,20 @@ const ME_FIELDS = [
   'quests',
   'counters',
   'records',
+  'pets',
+  'petsEquipped',
+  'petIndex',
+  'sessionStart',
+  'giftsClaimed',
+  'spinReadyAt',
+  'continueDay',
+  'continuesUsed',
+  'starTiers',
 ]
 
 let client = null
+/** How long the lucky wheel spins before showing its prize (matches the CSS transition). */
+const SPIN_MS = 4200
 /** Close code the server uses when it moves riders to a fresh server (see BikeRoom.drainLobbies). */
 const MOVE_SERVER_CODE = 4002
 let room = null
@@ -157,7 +168,7 @@ function wireRoom(r) {
   const store = useGameStore
 
   r.onMessage('welcome', (m) => {
-    store.setState({ lobby: { number: m.lobby, roomId: m.roomId, max: m.maxPlayers } })
+    store.setState({ lobby: { number: m.lobby, roomId: m.roomId, max: m.maxPlayers }, serverOffset: (m.serverTime ?? Date.now()) - Date.now() })
     const sdk = getSDK()
     safeCall(sdk?.game?.updateRoom?.bind(sdk.game), m.roomId, '')
     for (const name of m.roster || []) safeCall(sdk?.game?.playerInRoom?.bind(sdk.game), name)
@@ -198,7 +209,34 @@ function wireRoom(r) {
       sound.error()
       return
     }
-    if (m.reward) spawnRewardPopup(describeReward(m.reward), 'reward')
+    if (m.spin !== undefined && m.spin !== null) {
+      // The wheel lands on the server's slot; its prize shows when it stops.
+      const SEG = 360 / SPIN_REWARDS.length
+      const prev = gameState().spinAngle
+      const angle = Math.ceil(prev / 360) * 360 + 5 * 360 + (360 - (m.spin + 0.5) * SEG)
+      const at = Date.now()
+      useGameStore.setState({ spinResult: { slot: m.spin, reward: m.reward, hatch: m.hatch, at }, spinAngle: angle })
+      sound.whoosh()
+      setTimeout(() => {
+        useGameStore.setState({ spinShown: at })
+        if (m.reward?.wins) rainWins(m.reward.wins)
+        if (m.reward && !m.reward.egg) spawnRewardPopup(describeReward(m.reward), 'reward')
+        if (m.hatch) useGameStore.setState({ hatching: { ...m.hatch, at: Date.now() } })
+        sound.fanfare()
+      }, SPIN_MS)
+      return
+    }
+    if (m.hatch) {
+      useGameStore.setState({ hatching: { ...m.hatch, at: Date.now() } })
+      sound.whoosh()
+      return
+    }
+    if (m.continued) {
+      useGameStore.setState({ continueTo: m.continued, deathPrompt: null })
+      sound.whoosh()
+      return
+    }
+    if (m.reward && !m.reward.egg) spawnRewardPopup(describeReward(m.reward), 'reward')
     if (m.reward?.wins) setTimeout(() => rainWins(m.reward.wins), 300)
     if (m.toast) gameState().toast(m.toast, 'success')
     if (m.celebrate) {
@@ -215,6 +253,16 @@ function wireRoom(r) {
   })
 
   r.onMessage('needPass', ({ product }) => gameState().openPanel('shop', { highlight: product }))
+
+  // New stars unlocked a star reward (Star Trail, Star Bike…).
+  r.onMessage('starReward', ({ total, given }) => {
+    for (const tier of given) {
+      gameState().toast(`⭐ ${total} stars! ${describeReward(tier)}`, 'success', 4000)
+      if (tier.wins) rainWins(tier.wins)
+    }
+    confetti(1.5)
+    sound.fanfare()
+  })
 
   r.onMessage('chat', (m) => {
     gameState().addChat(m)

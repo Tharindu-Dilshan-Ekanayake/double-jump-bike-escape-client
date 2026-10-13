@@ -1,5 +1,6 @@
 import { useGameStore } from '../../store/gameStore'
 import { FeedbackPanel, ItemShopPanel } from './ItemShopPanel'
+import { PetsPanel, SpinPanel } from './PlayPanels'
 import { DailyRewardPanel, OfflinePanel } from './RetentionPanels'
 import {
   CodesPanel,
@@ -55,6 +56,10 @@ function renderPanel(id, me, props) {
       return <OfflinePanel props={props} />
     case 'feedback':
       return <FeedbackPanel />
+    case 'pets':
+      return <PetsPanel me={me} props={props} />
+    case 'spin':
+      return <SpinPanel me={me} />
     default:
       return null
   }
